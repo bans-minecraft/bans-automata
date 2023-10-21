@@ -28,6 +28,7 @@
 --   }
 -- }
 
+package.path = "/?.lua;" .. package.path
 local Log = require("lib/log")
 local Utils = require("lib/utils")
 

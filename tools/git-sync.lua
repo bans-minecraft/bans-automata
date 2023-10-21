@@ -1,3 +1,4 @@
+package.path = "/?.lua;" .. package.path
 local Base64 = require("lib.base64")
 
 local HOST = "git.blakerain.com"

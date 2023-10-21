@@ -23,6 +23,7 @@
 -- }
 --
 
+package.path      = "/?.lua;" .. package.path
 local AANode      = require("lib.bot.aa.node");
 local Bot         = require("lib.bot");
 local Direction   = require("lib.direction");
