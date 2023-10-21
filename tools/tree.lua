@@ -10,19 +10,20 @@ local function list(path)
     local path = fs.combine(path, files[i])
     local dir = fs.isDir(path)
     if i == #files then
-      print(beams() .. "└─ " .. files[i])
+      print(beams() .. "+- " .. files[i])
     else
-      print(beams() .. "├─ " .. files[i])
+      print(beams() .. "+- " .. files[i])
     end
 
     if dir then
       if i == #files then
-        table.insert(BEAMS, "   ")
+        table.insert(BEAMS, 1, "   ")
       else
-        table.insert(BEAMS, "│  ")
+        table.insert(BEAMS, 1, "|  ")
       end
 
       list(path)
+      table.remove(BEAMS, 1)
     end
   end
 end
