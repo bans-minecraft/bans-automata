@@ -41,7 +41,7 @@
 -- [2023-06-17] Removed fuel-slot test in depositBlocks to avoid clogged fuel slot after mining
 -- [2023-06-18] Simplify ores lookup to use table rather than list
 
-package.path       = "/?.lua;" .. package.path
+package.path       = "/?.lua;/?/init.lua;" .. package.path
 local AANode       = require("lib.bot.aa.node")
 local Bot          = require("lib.bot")
 local Direction    = require("lib.direction")
@@ -49,6 +49,8 @@ local Log          = require("lib.log")
 local Ores         = require("lib.bot.ores")
 local Utils        = require("lib.utils")
 local Vector       = require("lib.vector")
+
+Log.setLogFile("bot-log.txt")
 
 local BRANCH_GAP   = 3   -- Number of blocks between branches (default: 3)
 local MAX_BRANCHES = 200 -- Maximum number of branches (default: 200)
