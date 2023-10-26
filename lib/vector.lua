@@ -8,9 +8,9 @@ function M:create(...)
   setmetatable(v, M)
 
   if #args == 0 then
-    v.x = args[1]
-    v.y = args[2]
-    v.z = args[3]
+    v.x = 0
+    v.y = 0
+    v.z = 0
   elseif #args == 1 then
     if type(args[1]) == "number" then
       v.x = args[1]
