@@ -70,7 +70,7 @@ end
 
 local function main(args)
   local args = args or {}
-  local dest = args[1] or "."
+  local dest = args[1] or shell.dir()
   downloadLuaFiles(dest)
 end
 
