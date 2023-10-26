@@ -6,12 +6,11 @@ local function copy(target, path)
     end
 
     local files = fs.list(path)
-    print(("Processing %d files in %s"):format(#files, path))
     for _, inner in ipairs(files) do
       copy(fs.combine(target, inner), fs.combine(path, inner))
     end
   else
-    print("Copying file: " .. path)
+    print("Creating file: " .. target)
     fs.copy(path, target)
   end
 end
@@ -23,7 +22,7 @@ if #args < 1 then
   return
 end
 
-local SOURCES = ["automata", "lib", "tools"]
+local SOURCES = { "automata", "lib", "tools" }
 for _, source in ipairs(SOURCES) do
-  copy(source, args[1])
+  copy(fs.combine(args[1], source), source)
 end
