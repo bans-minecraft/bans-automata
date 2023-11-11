@@ -1,4 +1,9 @@
+-- make-concrete.lua
+--
+-- A bot that create white concrete powder.
+--
 -- [2023-11-10] Makes the white dye
+-- [2023-11-11] Completed creation of white concrete power
 
 package.path = "/?.lua;/?/init.lua;" .. package.path
 local Log = require("lib.log")
