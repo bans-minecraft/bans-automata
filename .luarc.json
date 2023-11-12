@@ -1,3 +1,7 @@
 {
-  "workspace.library": []
+  "workspace.library": [],
+  "Lua.format.defaultConfig": {
+    "indent_style": "space",
+    "indent_space": "2"
+  }, badd
 }
