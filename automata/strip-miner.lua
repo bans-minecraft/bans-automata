@@ -10,7 +10,7 @@
 --
 -- strip-miner-v2.lua
 -- Copyright (C) 2023, Blake Rain.
--- Licensed under the MIT License. See LICENSE for details.
+-- Licensed under the BSD3 License. See LICENSE for details.
 --
 -- A simple strip miner implementation.
 --
@@ -41,32 +41,32 @@
 -- [2023-06-17] Removed fuel-slot test in depositBlocks to avoid clogged fuel slot after mining
 -- [2023-06-18] Simplify ores lookup to use table rather than list
 
-package.path    = "/?.lua;/?/init.lua;" .. package.path
-local AANode    = require("lib.bot.aa.node")
-local Bot       = require("lib.bot")
+package.path = "/?.lua;/?/init.lua;" .. package.path
+local AANode = require("lib.bot.aa.node")
+local Bot = require("lib.bot")
 local Direction = require("lib.direction")
-local Log       = require("lib.log")
-local Ores      = require("lib.bot.ores")
-local Utils     = require("lib.utils")
-local Vector    = require("lib.vector")
+local Log = require("lib.log")
+local Ores = require("lib.bot.ores")
+local Utils = require("lib.utils")
+local Vector = require("lib.vector")
 
 Log.setLogFile("bot-log.txt")
 
-local BRANCH_GAP   = 3   -- Number of blocks between branches (default: 3)
+local BRANCH_GAP = 3 -- Number of blocks between branches (default: 3)
 local MAX_BRANCHES = 200 -- Maximum number of branches (default: 200)
-local MAX_DEPTH    = 200 -- Maximum branch depth (default: 200)
+local MAX_DEPTH = 200 -- Maximum branch depth (default: 200)
 
-local Miner        = {}
-Miner.__index      = Miner
-Miner.__name       = "Miner"
+local Miner = {}
+Miner.__index = Miner
+Miner.__name = "Miner"
 
 function Miner:create(dir)
   local miner = {}
   setmetatable(miner, Miner)
 
-  miner.bot         = Bot:create(dir)
+  miner.bot = Bot:create(dir)
   miner.branchIndex = -1
-  miner.branchSide  = ""
+  miner.branchSide = ""
 
   return miner
 end
@@ -173,7 +173,9 @@ function Miner:moveUp(count, dig)
   while moved < count do
     while true do
       local ok, err = self.bot:up()
-      if ok then break end
+      if ok then
+        break
+      end
 
       if not dig then
         Log.error("Bot was unable to move: blocked, unable to dig")
@@ -198,7 +200,9 @@ function Miner:moveDown(count, dig)
   while moved < count do
     while true do
       local ok, err = self.bot:down()
-      if ok then break end
+      if ok then
+        break
+      end
 
       if not dig then
         Log.error("Bot was unable to move: blocked, unable to dig")
@@ -223,7 +227,9 @@ function Miner:moveForwards(count, dig, digUp)
   while moved < count do
     while true do
       local ok, err = self.bot:forward()
-      if ok then break end
+      if ok then
+        break
+      end
 
       if not dig then
         Log.error("Bot was unable to move: blocked, unable to dig")
@@ -260,7 +266,7 @@ end
 function Miner:findBranch()
   -- Reset our branch state variables
   self.branchIndex = -1
-  self.branchSide  = ""
+  self.branchSide = ""
 
   while self.branchIndex < MAX_BRANCHES do
     -- Move forwards to the next branch position, allow mining forwards and up for main corridor.
@@ -299,10 +305,10 @@ function Miner:excavationScan()
 
   local queries = {
     { self.bot:queryForward(), self.bot.dir },
-    { self.bot:queryLeft(),    self.bot:leftDirection() },
-    { self.bot:queryRight(),   self.bot:rightDirection() },
-    { self.bot:queryUp(),      Direction.Up },
-    { self.bot:queryDown(),    Direction.Down }
+    { self.bot:queryLeft(), self.bot:leftDirection() },
+    { self.bot:queryRight(), self.bot:rightDirection() },
+    { self.bot:queryUp(), Direction.Up },
+    { self.bot:queryDown(), Direction.Down },
   }
 
   for _, query in ipairs(queries) do
@@ -360,8 +366,12 @@ function Miner:excavate()
 
         -- If we couldn't mine, then we want to abandon this excavation: something is wrong
         if not ok then
-          Log.error(("Failed to mine block in direction %s of bot position %s")
-            :format(Direction.dirName(target_dir), target_pos))
+          Log.error(
+            ("Failed to mine block in direction %s of bot position %s"):format(
+              Direction.dirName(target_dir),
+              target_pos
+            )
+          )
           break
         end
 
@@ -410,8 +420,14 @@ end
 function Miner:mineBranch(returning)
   local depth = 0
 
-  Log.info(("Mining %d blocks %s branch %d on the %s")
-    :format(MAX_DEPTH, returning and "back up" or "down", self.branchIndex + 1, self.branchSide))
+  Log.info(
+    ("Mining %d blocks %s branch %d on the %s"):format(
+      MAX_DEPTH,
+      returning and "back up" or "down",
+      self.branchIndex + 1,
+      self.branchSide
+    )
+  )
 
   while depth < MAX_DEPTH do
     -- Move the bot forwards, doing our mining (dig forwards and up)
@@ -442,8 +458,12 @@ function Miner:mineBranch(returning)
     end
 
     if self.bot.dir ~= start_dir then
-      Log.info(("Returning to original direction %s (was %s)")
-        :format(Direction.dirName(self.bot.dir), Direction.dirName(start_dir)))
+      Log.info(
+        ("Returning to original direction %s (was %s)"):format(
+          Direction.dirName(self.bot.dir),
+          Direction.dirName(start_dir)
+        )
+      )
       self.bot:face(start_dir)
     end
   end
@@ -471,8 +491,7 @@ function Miner:loop()
       Log.error(("Fuel level %d is below minimum of %d"):format(fuel_level, Bot.MIN_FUEL))
       return
     else
-      Log.info(("Bot has %d fuel, which is at least minimum of %d")
-        :format(fuel_level, Bot.MIN_FUEL))
+      Log.info(("Bot has %d fuel, which is at least minimum of %d"):format(fuel_level, Bot.MIN_FUEL))
     end
 
     -- Move forwards to the start position. This is one block forwards of our home position (no digging).
