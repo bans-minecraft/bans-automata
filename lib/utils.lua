@@ -75,4 +75,42 @@ M.loadConfig = function(config_path, defaults)
   return M.applyDefaults(config, defaults or {})
 end
 
+M.numberOrDefault = function(value, default)
+  if value == nil then
+    return default
+  end
+
+  Log.assertIs(value, "number")
+  return value
+end
+
+M.stringContains = function(str, sub)
+  return str:find(sub, 1, true) ~= nil
+end
+
+M.stringStartsWith = function(str, prefix)
+  return str:sub(1, #prefix) == prefix
+end
+
+M.stringReplace = function(str, old, new)
+  local start = 1
+
+  while true do
+    local start_ix, end_ix = str:find(old, start, true)
+    if not start_ix then
+      break
+    end
+
+    local post = str:sub(end_ix + 1)
+    str = str:sub(1, (start_ix - 1)) .. new .. post
+    start = -1 * post:len()
+  end
+
+  return str
+end
+
+M.stringInsert = function(str, pos, text)
+  return str:sub(1, pos - 1) .. text .. str:sub(pos)
+end
+
 return M

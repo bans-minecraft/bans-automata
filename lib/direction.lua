@@ -1,16 +1,17 @@
-local Vector = require("lib.vector");
-local Log = require("lib.log");
+local Vector = require("lib.vector")
+local Log = require("lib.log")
+local Utils = require("lib.utils")
 
 -- A direction
 --
 -- Note that these are global (world) directions, and should not be used relatively
 local M = {
   North = 0,
-  West  = 1,
+  West = 1,
   South = 2,
-  East  = 3,
-  Up    = 4,
-  Down  = 5,
+  East = 3,
+  Up = 4,
+  Down = 5,
 }
 
 -- Make sure that the argument is a valid direction
@@ -88,7 +89,7 @@ local DIR_ALIASES = {
   ["East"] = M.East,
   ["West"] = M.West,
   ["Up"] = M.Up,
-  ["Down"] = M.Down
+  ["Down"] = M.Down,
 }
 
 for key, value in pairs(DIR_ALIASES) do
@@ -98,6 +99,77 @@ end
 
 M.parseDirection = function(name)
   return DIR_ALIASES[name]
+end
+
+local DirSeqStep = {}
+DirSeqStep.__index = DirSeqStep
+DirSeqStep.__name = "DirSeqStep"
+
+function DirSeqStep:create(direction, count)
+  local step = {}
+  setmetatable(step, DirSeqStep)
+
+  M.assertDir(direction)
+  step.direction = direction
+  step.count = Utils.numberOrDefault(count, 1)
+
+  return step
+end
+
+local DirSeq = {}
+DirSeq.__index = DirSeq
+DirSeq.__name = "DirSeq"
+
+function DirSeq:create()
+  local seq = { steps = {} }
+  setmetatable(seq, DirSeq)
+  return seq
+end
+
+function DirSeq:finish()
+  return self.steps
+end
+
+function DirSeq:add(step)
+  Log.assertClass(step, DirSeqStep)
+  table.insert(self.steps, step)
+end
+
+function DirSeq:north(count)
+  self:add(DirSeqStep:create(M.North, count))
+  return self
+end
+
+function DirSeq:south(count)
+  self:add(DirSeqStep:create(M.South, count))
+  return self
+end
+
+function DirSeq:east(count)
+  self:add(DirSeqStep:create(M.East, count))
+  return self
+end
+
+function DirSeq:west(count)
+  self:add(DirSeqStep:create(M.West, count))
+  return self
+end
+
+function DirSeq:up(count)
+  self:add(DirSeqStep:create(M.Up, count))
+  return self
+end
+
+function DirSeq:down(count)
+  self:add(DirSeqStep:create(M.Down, count))
+  return self
+end
+
+M.DirSeqStep = DirSeqStep
+M.DirSeq = DirSeq
+
+M.seq = function()
+  return DirSeq:create()
 end
 
 return M

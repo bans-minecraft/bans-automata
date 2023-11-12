@@ -25,18 +25,18 @@
 -- block.
 
 local Direction = require("lib.direction")
-local Log       = require("lib.log")
-local Utils     = require("lib.utils")
-local Vector    = require("lib.vector")
-local AANode    = require("lib.bot.aa.node")
-local AAUtils   = require("lib.bot.aa.utils")
+local Log = require("lib.log")
+local Utils = require("lib.utils")
+local Vector = require("lib.vector")
+local AANode = require("lib.bot.aa.node")
+local AAUtils = require("lib.bot.aa.utils")
 
 -- Area Awareness (AA)
 --
 -- This class encapsulates the AA graph, and provides some simple functions over that graph.
-local AA        = {}
-AA.__index      = AA
-AA.__name       = "AA"
+local AA = {}
+AA.__index = AA
+AA.__name = "AA"
 
 function AA:create()
   local aa = {}
@@ -119,6 +119,13 @@ function AA:checkOre(v)
   return node:isOre(), node
 end
 
+function AA:dump()
+  Log.info(("AA contains %d nodes"):format(#self.cache))
+  for key, node in pairs(self.cache) do
+    Log.info(("%s: %s"):format(key, node))
+  end
+end
+
 function AA:updateIndex(index, node)
   Log.assertIs(index, "number")
   Log.assertClass(node, AANode)
@@ -150,30 +157,30 @@ function AA:buildPath(a, b, limit)
   -- The following tables (i.e. `openSet` and `visited`) are all indexed in the same as was the AA
   -- cache: by the string returned from `AAUtils.positionKey`.
 
-  local startIndex    = AAUtils.positionKey(a)
-  local goalIndex     = AAUtils.positionKey(b)
-  local openSet       = {} -- a table of vectors that have yet to be processed
-  local closedSet     = {} -- a table of booleans indicating that we've processed a vector
-  local visited       = {} -- a table of pairs of a direction and the index (a string key)
-  local gScore        = {} -- a table of gScores for each vector
-  local fScore        = {} -- a table of fScores for each vector
+  local startIndex = AAUtils.positionKey(a)
+  local goalIndex = AAUtils.positionKey(b)
+  local openSet = {} -- a table of vectors that have yet to be processed
+  local closedSet = {} -- a table of booleans indicating that we've processed a vector
+  local visited = {} -- a table of pairs of a direction and the index (a string key)
+  local gScore = {} -- a table of gScores for each vector
+  local fScore = {} -- a table of fScores for each vector
 
   -- Add the start node and its score to the open set
   openSet[startIndex] = a:clone()
-  gScore[startIndex]  = 0
-  fScore[startIndex]  = AAUtils.costEstimate(a, b)
+  gScore[startIndex] = 0
+  fScore[startIndex] = AAUtils.costEstimate(a, b)
 
   while not Utils.isEmpty(openSet) do
     local fCurrent = 9999999
-    local current      -- a Vector
+    local current -- a Vector
     local currentIndex -- a string index
 
     -- Find the node with the lowest fScore in the open set.
     for i, node in pairs(openSet) do
       if node ~= nil and fScore[i] <= fCurrent then
         currentIndex = i
-        current      = node:clone()
-        fCurrent     = fScore[i]
+        current = node:clone()
+        fCurrent = fScore[i]
       end
     end
 
@@ -189,15 +196,15 @@ function AA:buildPath(a, b, limit)
     end
 
     -- Remove the 'current' block from the open set and add it to the closed set.
-    openSet[currentIndex]   = nil
+    openSet[currentIndex] = nil
     closedSet[currentIndex] = true
 
     -- Scan in all six directions from the current block. If we find a neighbouring block that is
     -- known to be empty, calculate the score for that neighbour and add it to the open set.
     for dir = 0, 5 do
-      local n              = Direction.offsetDirection(current, dir)
+      local n = Direction.offsetDirection(current, dir)
       local neighbourIndex = AAUtils.positionKey(n)
-      local neighbour      = self:queryIndex(neighbourIndex)
+      local neighbour = self:queryIndex(neighbourIndex)
 
       -- If the neighbour block in the direction `dir` is known to be `EMPTY` (by `AANode` status),
       -- and it is not already present in the closed set, then calculate the score and add it to the
@@ -213,8 +220,8 @@ function AA:buildPath(a, b, limit)
         -- score will be improved since we last added them.
         if openSet[neighbourIndex] == nil or g <= gScore[neighbourIndex] then
           visited[neighbourIndex] = { dir, currentIndex }
-          gScore[neighbourIndex]  = g
-          fScore[neighbourIndex]  = g + AAUtils.costEstimate(n, b)
+          gScore[neighbourIndex] = g
+          fScore[neighbourIndex] = g + AAUtils.costEstimate(n, b)
           openSet[neighbourIndex] = n
         end
       end

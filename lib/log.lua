@@ -4,7 +4,7 @@ local M = {}
 M.level = {
   info = { "INFO ", colors.cyan },
   warn = { "WARN ", colors.yellow },
-  error = { "ERROR", colors.red }
+  error = { "ERROR", colors.red },
 }
 
 M.logfile = nil
@@ -63,9 +63,13 @@ for level, _ in pairs(M.level) do
   end
 end
 
-M.assert = function(value)
+M.assert = function(value, message)
   if not value then
-    M.error("Assertion failed")
+    if message then
+      error("Assertion failed: " + message)
+    else
+      error("Assertion failed")
+    end
   end
 end
 
@@ -76,14 +80,34 @@ M.assertIs = function(value, type_name)
 end
 
 M.assertClass = function(value, class)
-  if type(value) ~= "table" or value.__index ~= class then
+  if type(value) ~= "table" then
+    local message = ("Assertion failed: expected '%s' found '%s'"):format(class.__name, type(value))
+    error(message)
+  end
+
+  if value.__index ~= class then
     local found = type(value)
     if value.__index and value.__index.__name then
       found = value.__index.__name
     end
 
-    M.error("Assertion failed: expected", class.__name, "found", type(value))
+    local message = ("Assertion failed: expected '%s' found '%s'"):format(class.__name, found)
+    error(message)
   end
+end
+
+local function trapHandler(err)
+  M.error("Error called:", err)
+  return err
+end
+
+M.trap = function(func, ...)
+  local args = { ... }
+  local stub = function()
+    func(table.unpack(args))
+  end
+
+  return xpcall(stub, trapHandler)
 end
 
 return M

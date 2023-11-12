@@ -1,20 +1,20 @@
 local Direction = require("lib.direction")
-local Vector    = require("lib.vector")
-local Log       = require("lib.log")
-local AA        = require("lib.bot.aa")
-local AANode    = require("lib.bot.aa.node")
+local Vector = require("lib.vector")
+local Log = require("lib.log")
+local AA = require("lib.bot.aa")
+local AANode = require("lib.bot.aa.node")
 
 -- The Bot class
 --
 -- This class provides the functionality for diving the bot, performing mining actions, and
 -- maintaining the AA.
 
-local Bot       = {}
-Bot.__index     = Bot
-Bot.__name      = "Bot"
+local Bot = {}
+Bot.__index = Bot
+Bot.__name = "Bot"
 
-Bot.FUEL_SLOT   = 16   -- Inventory slot in which fuel is stored (default: 16)
-Bot.MIN_FUEL    = 1000 -- Minimum fiel required for operation (default: 1000)
+Bot.FUEL_SLOT = 16 -- Inventory slot in which fuel is stored (default: 16)
+Bot.MIN_FUEL = 1000 -- Minimum fiel required for operation (default: 1000)
 
 function Bot:create(dir)
   local bot = {}
@@ -23,18 +23,18 @@ function Bot:create(dir)
   -- We keep track of the slot into which we should pace fuel, and the minimum amount of fuel that
   -- we need to operate.
   bot.fuelSlot = Bot.FUEL_SLOT
-  bot.minFuel  = Bot.MIN_FUEL
+  bot.minFuel = Bot.MIN_FUEL
 
   -- The current position and direction of the bot. The position is typically relative to the start
   -- of the bot's process (often referred to as the "home" position). The direction should be the
   -- global (world) direction, as seen in the F3 debug overlay. if no direction is given in the
   -- `dir` argument to this constructor, we default to North.
-  bot.pos      = Vector:create()
-  bot.start    = Vector:create()
-  bot.dir      = dir or Direction.North
+  bot.pos = Vector:create()
+  bot.start = Vector:create()
+  bot.dir = dir or Direction.North
 
   -- Create the Area Awareness system
-  bot.aa       = AA:create()
+  bot.aa = AA:create()
 
   -- When the bot is created, perform a scan around our immediate environment to initialize the AA.
   bot:cacheAround()
@@ -71,19 +71,19 @@ function Bot:rightPosition()
 end
 
 function Bot:cacheBlockFront()
-  local v    = self:forwardPosition()
+  local v = self:forwardPosition()
   local node = self.aa:getNodeForward()
   self.aa:update(v, node)
 end
 
 function Bot:cacheBlockUp()
-  local v    = self:relativePosition(Direction.Up)
+  local v = self:relativePosition(Direction.Up)
   local node = self.aa:getNodeUp()
   self.aa:update(v, node)
 end
 
 function Bot:cacheBlockDown()
-  local v    = self:relativePosition(Direction.Down)
+  local v = self:relativePosition(Direction.Down)
   local node = self.aa:getNodeDown()
   self.aa:update(v, node)
 end
@@ -96,7 +96,7 @@ function Bot:cacheBlocks()
 end
 
 function Bot:query(dir, refresh)
-  local v    = self:relativePosition(dir)
+  local v = self:relativePosition(dir)
   local node = refresh and AANode:createUnknown() or self.aa:query(v)
 
   if node.state == AANode.UNKNOWN then
@@ -118,29 +118,31 @@ function Bot:query(dir, refresh)
 end
 
 function Bot:queryForward(refresh)
-  self:query(self.dir, refresh)
+  return self:query(self.dir, refresh)
 end
 
 function Bot:queryUp(refresh)
-  self:query(Direction.Up, refresh)
+  return self:query(Direction.Up, refresh)
 end
 
 function Bot:queryDown(refresh)
-  self:query(Direction.Down, refresh)
+  return self:query(Direction.Down, refresh)
 end
 
 function Bot:queryLeft(refresh)
-  self:query(self:leftDirection(), refresh)
+  return self:query(self:leftDirection(), refresh)
 end
 
 function Bot:queryRight(refresh)
-  self:query(self:rightDirection(), refresh)
+  return self:query(self:rightDirection(), refresh)
 end
 
 function Bot:cacheAround()
   for _ = 0, 3 do
     local ok, err = self:turnLeft()
-    if not ok then return false, err end
+    if not ok then
+      return false, err
+    end
   end
 
   return true
@@ -148,16 +150,24 @@ end
 
 function Bot:cacheSides()
   local ok, err = self:turnLeft()
-  if not ok then return false, err end
+  if not ok then
+    return false, err
+  end
 
   ok, err = self:turnRight()
-  if not ok then return false, err end
+  if not ok then
+    return false, err
+  end
 
   ok, err = self:turnRight()
-  if not ok then return false, err end
+  if not ok then
+    return false, err
+  end
 
   ok, err = self:turnLeft()
-  if not ok then return false, err end
+  if not ok then
+    return false, err
+  end
 
   return true
 end
@@ -231,6 +241,16 @@ function Bot:turnRight()
   return true
 end
 
+function Bot:turn(side)
+  if side == "left" then
+    return self:turnLeft()
+  elseif side == "right" then
+    return self:turnRight()
+  else
+    Log.error(" ")
+  end
+end
+
 function Bot:face(dir)
   if dir == self.dir then
     return true
@@ -250,10 +270,14 @@ function Bot:face(dir)
   end
 
   local ok, err = self:turnRight()
-  if not ok then return false, err end
+  if not ok then
+    return false, err
+  end
 
   ok, err = self:turnRight()
-  if not ok then return false, err end
+  if not ok then
+    return false, err
+  end
 
   return true
 end
