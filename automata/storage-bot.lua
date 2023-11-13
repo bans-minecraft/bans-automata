@@ -23,7 +23,7 @@ local Bot = require("lib.bot")
 local Log = require("lib.log")
 local Direction = require("lib.direction")
 local Utils = require("lib.utils")
-local Vector3 = require("lib.vector")
+local Vector = require("lib.vector")
 
 Log.setLogFile("storage-log.txt")
 
@@ -44,6 +44,17 @@ function Coord:create(row, col)
   local coord = { row = row, col = col }
   setmetatable(coord, Coord)
   return coord
+end
+
+function Coord:deserialize(data)
+  Log.assertIs(data, "table")
+  Log.assertIs(data.row, "number")
+  Log.assertIs(data.col, "number")
+  return Coord:create(data.row, data.col)
+end
+
+function Coord:serialize()
+  return { row = self.row, col = self.col }
 end
 
 function Coord:clone()
@@ -76,12 +87,43 @@ function Drawer:create(set, side, coord)
   drawer.set = set
   drawer.side = side
   drawer.coord = coord
-  drawer.pos = Vector3:create()
+  drawer.pos = Vector:create()
   drawer.dir = 0
   drawer.size = 0
   drawer.slots = {}
 
   return drawer
+end
+
+function Drawer:deserialize(data)
+  Log.assertIs(data, "table")
+  Log.assertIs(data.side, "string")
+  Log.assertIs(data.dir, "number")
+  Log.assertIs(data.size, "number")
+  Log.assertIs(data.slots, "table")
+
+  local set = Coord:deserialize(data.set)
+  local coord = Coord:deserialize(data.coord)
+  local drawer = Drawer:create(set, data.side, coord)
+
+  drawer.pos = Vector:deserialize(data.pos)
+  drawer.dir = data.dir
+  drawer.size = data.size
+  drawer.slots = data.slots
+
+  return drawer
+end
+
+function Drawer:serialize()
+  return {
+    set = self.set:serialize(),
+    side = self.side,
+    coord = self.coord:serialize(),
+    pos = self.pos:serialize(),
+    dir = self.dir,
+    size = self.size,
+    slots = self.slots,
+  }
 end
 
 function Drawer:__tostring()
@@ -140,6 +182,44 @@ function DrawerSet:create(coord)
   return set
 end
 
+function DrawerSet:serialize()
+  local east = {}
+  local west = {}
+
+  for row = 1, STORAGE_SET_HEIGHT do
+    east[row] = {}
+    west[row] = {}
+
+    for col = 1, STORAGE_SET_WIDTH do
+      east[row][col] = self.drawers.east[row][col]:serialize()
+      west[row][col] = self.drawers.west[row][col]:serialize()
+    end
+  end
+
+  return {
+    coord = self.coord:serialize(),
+    drawers = {
+      east = east,
+      west = west,
+    },
+  }
+end
+
+function DrawerSet:deserialize(data)
+  Log.assertIs(data, "table")
+
+  local set = DrawerSet:create(Coord:deserialize(data.coord))
+
+  for row = 1, STORAGE_SET_HEIGHT do
+    for col = 1, STORAGE_SET_WIDTH do
+      set.drawers.east[row][col] = Drawer:deserialize(data.drawers.east[row][col])
+      set.drawers.west[row][col] = Drawer:deserialize(data.drawers.west[row][col])
+    end
+  end
+
+  return set
+end
+
 -----------------------------------------------------------------------------------------------
 
 local StoreBot = {}
@@ -165,16 +245,57 @@ function StoreBot:create()
 end
 
 function StoreBot:save()
+  local drawer_sets = {}
+  for _, drawer_set in ipairs(self.drawerSets) do
+    table.insert(drawer_sets, drawer_set:serialize())
+  end
+
   local file = fs.open("storage-bot.data", "w")
   file.write(textutils.serialize({
-    home = self.home,
-    bot = {
-      pos = self.bot.pos,
-      dir = self.bot.dir,
-    },
-    drawerSets = self.drawerSets,
+    home = self.home:serialize(),
+    bot = self.bot:serialize(),
+    drawerSets = drawer_sets,
   }))
   file.close()
+end
+
+function StoreBot:load()
+  local file = fs.open("storage-bot.data", "r")
+  local text = file.readAll()
+  local data = textutils.unserialize(text)
+  file.close()
+
+  if not data then
+    Log.error("Failed to read storage bot data")
+    return false, "Failed to read storage bot data"
+  end
+
+  Log.assertIs(data, "table")
+  self.home = Vector:deserialize(data.home)
+  self.bot = Bot:deserialize(data.bot)
+
+  self.drawerSets = {}
+  self.itemLocations = {}
+
+  local ndrawers = 0
+  local nitems = 0
+  for _, set_data in ipairs(data.drawerSets) do
+    local drawer_set = DrawerSet:deserialize(set_data)
+    table.insert(self.drawerSets, drawer_set)
+
+    for row = 1, STORAGE_SET_HEIGHT do
+      for col = 1, STORAGE_SET_WIDTH do
+        nitems = nitems + self:addLocationsForDrawer(drawer_set.drawers.east[row][col])
+        nitems = nitems + self:addLocationsForDrawer(drawer_set.drawers.west[row][col])
+        ndrawers = ndrawers + 2
+      end
+    end
+  end
+
+  Log.info(("Loaded %d drawers over %d drawer sets"):format(ndrawers, #self.drawerSets))
+  Log.info(("Loaded locations for %d items"):format(nitems))
+
+  return true
 end
 
 function StoreBot:getDrawerSet(coord)
@@ -207,7 +328,7 @@ function StoreBot:addLocationsForDrawer(drawer)
     end
   end
 
-  Log.info(("Stored %d item locations for drawer %s"):format(count, drawer))
+  return count
 end
 
 function StoreBot:receiveFuel()
@@ -575,8 +696,56 @@ function StoreBot:scan()
   return true
 end
 
-function StoreBot:run()
-  local ok, err
+function StoreBot:fetchInput()
+  local ok, err = self.bot:face(Direction.West)
+  if not ok then
+    Log.error("Unable to turn to input chest:", err)
+    return nil, "Unable to turn to input chest"
+  end
+
+  local chest = peripheral.wrap("front")
+  if not chest then
+    Log.error("Failed to wrap peripheral for input chest")
+    return nil, "Failed to wrap peripheral for input chest"
+  end
+
+  local size = chest.size()
+  Log.info(("Input chest has %d slots"):format(size))
+
+  local received = 0
+  local slot = 1
+
+  while true do
+    turtle.select(slot)
+    ok, err = turtle.suck(64)
+    if not ok then
+      break
+    end
+
+    local info = turtle.getItemDetail()
+    Log.info(("Bot received %dx %s"):format(info.count, info.name))
+    received = received + info.count
+
+    slot = slot + 1
+    if slot > 16 then
+      Log.info("Turtle is full of items (input may have more)")
+      break
+    end
+  end
+
+  Log.info(("Bot has received %d items from input"):format(received))
+
+  ok, err = self.bot:face(Direction.North)
+  if not ok then
+    Log.error("Unable to turn back to home direction:", err)
+    return nil, "Unable to turn back to home direction"
+  end
+
+  return received
+end
+
+function StoreBot:loop()
+  local count, ok, err
 
   -- Make sure that we have enough fuel
   ok, err = self:refuelIfNeeded()
@@ -585,7 +754,91 @@ function StoreBot:run()
     return false, "Failed to refuel bot"
   end
 
+  -- Turn to our input chest and see what's going on
+  count, err = self:fetchInput()
+  if count == nil then
+    Log.error("Failed to fetch input:", err)
+    return false, "Failed to fetch input"
+  end
+
+  -- If we didn't receive anything, wait for a bit and then try again
+  if count == 0 then
+    sleep(60)
+    return true
+  end
+
+  -- Go through all our inventory and place the items
+  for slot = 1, 16 do
+    local info = turtle.getItemDetail(slot)
+    if info then
+      local loc = self.itemLocations[info.name]
+      if loc then
+        Log.info(
+          ("Storing %dx %s in drawer %s on %s side of set %s"):format(
+            info.count,
+            info.name,
+            loc.coord,
+            loc.side,
+            loc.set
+          )
+        )
+
+        local drawer_set = self:getDrawerSet(loc.set)
+        local drawer = drawer_set.drawers[loc.side][loc.coord.row][loc.coord.col]
+
+        ok, err = self.bot:pathFind(drawer.pos)
+        if not ok then
+          Log.error("Failed to pathfind to storage drawer:", err)
+          return false, "Failed to pathfind to storage drawer"
+        end
+
+        ok, err = self.bot:face(drawer.dir)
+        if not ok then
+          Log.error("Failed to face storage drawer:", err)
+          return false, "Failed to face storage drawer"
+        end
+
+        turtle.select(slot)
+        turtle.drop()
+      else
+        Log.info(("Unable to store %dx %s (unknown item)"):format(info.count, info.name))
+      end
+    end
+  end
+
+  -- Return to the home location
+  ok, err = self.bot:pathFind(self.home, 200)
+  if not ok then
+    Log.error("Failed to path find back to start:", err)
+    return false, "Failed to return to start"
+  end
+
+  ok, err = self.bot:face(Direction.North)
+  if not ok then
+    Log.error("Failed to face north:", err)
+    return false, "Failed to face north"
+  end
+
   return true
+end
+
+function StoreBot:run()
+  local ok, err
+
+  -- Load the data for the bot
+  ok, err = self:load()
+  if not ok then
+    Log.error("Failed to load bot data:", err)
+    return false, "Failed to load bot data"
+  end
+
+  while true do
+    ok, err = self:loop()
+    if not ok then
+      Log.error("Main bot loop failed:", err)
+      return false, "Main bot loop failed"
+    end
+  end
 end
 
 local function main(...)
