@@ -45,6 +45,29 @@ function AA:create()
   return aa
 end
 
+function AA:deserialize(data)
+  Log.assertIs(data, "table")
+  Log.assertIs(data.cache, "table")
+
+  local aa = AA:create()
+  for key, value in pairs(data.cache) do
+    aa.cache[key] = AANode:deserialize(value)
+  end
+
+  return aa
+end
+
+function AA:serialize()
+  local cache = {}
+  for key, node in pairs(self.cache) do
+    cache[key] = node:serialize()
+  end
+
+  return {
+    cache = cache,
+  }
+end
+
 function AA:clear()
   self.cache = {}
 end

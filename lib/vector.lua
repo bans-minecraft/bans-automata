@@ -1,10 +1,12 @@
+local Log = require("lib.log")
+
 local M = {}
 M.__index = M
 M.__name = "Vector"
 
 function M:create(...)
   local args = { ... }
-  local v    = {}
+  local v = {}
   setmetatable(v, M)
 
   if #args == 0 then
@@ -48,6 +50,18 @@ function M:clone()
   v.y = self.y
   v.z = self.z
   return v
+end
+
+function M:deserialize(data)
+  Log.assertIs(data, "table")
+  Log.assertIs(data.x, "number")
+  Log.assertIs(data.y, "number")
+  Log.assertIs(data.z, "number")
+  return M:create(data.x, data.y, data.z)
+end
+
+function M:serialize()
+  return { x = self.x, y = self.y, z = self.z }
 end
 
 function M:__tostring()

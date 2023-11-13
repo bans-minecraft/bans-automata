@@ -1,25 +1,25 @@
-local Log         = require("lib.log");
-local Ores        = require("lib.bot.ores");
+local Log = require("lib.log")
+local Ores = require("lib.bot.ores")
 
 -- A node in the AA graph
 --
 -- Each node in the AA graph represents a block that the bot is "aware" of. Each node stores the
 -- `state` of the block along with the `info` about the block (as returned from the `turtle.inspect`
 -- method and its kin).
-local AANode      = {}
-AANode.__index    = AANode
-AANode.__name     = "AANode"
+local AANode = {}
+AANode.__index = AANode
+AANode.__name = "AANode"
 
 -- Possible states of an AANode
-AANode.UNKNOWN    = -1 -- Block state is unknown
-AANode.EMPTY      = 0  -- Block is empty (contains air, water, or other traversable)
-AANode.FULL       = 1  -- Block is full (contains non-traversable)
+AANode.UNKNOWN = -1 -- Block state is unknown
+AANode.EMPTY = 0 -- Block is empty (contains air, water, or other traversable)
+AANode.FULL = 1 -- Block is full (contains non-traversable)
 
 -- Minecraft blocks that we consider traversable
 local TRAVERSABLE = {
-  ["minecraft:air"]   = true,
+  ["minecraft:air"] = true,
   ["minecraft:water"] = true,
-  ["minecraft:lava"]  = true,
+  ["minecraft:lava"] = true,
 }
 
 function AANode:create(state, info)
@@ -29,9 +29,20 @@ function AANode:create(state, info)
   local node = {}
   setmetatable(node, AANode)
   node.state = state
-  node.info  = info
+  node.info = info
 
   return node
+end
+
+function AANode:deserialize(value)
+  Log.assertIs(value, "table")
+  Log.assertIs(value.state, "number")
+  Log.assertIs(value.info, "table")
+  return AANode:create(value.state, value.info)
+end
+
+function AANode:serialize()
+  return { state = self.state, info = self.info }
 end
 
 -- Create an AA node for an empty block.

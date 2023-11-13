@@ -41,6 +41,33 @@ function Bot:create(dir)
   return bot
 end
 
+function Bot:deserialize(data)
+  Log.assertIs(data, "table")
+  Log.assertIs(data.fuelSlot, "number")
+  Log.assertIs(data.minFuel, "number")
+  Log.assertIs(data.dir, "number")
+
+  local bot = Bot:create(data.dir)
+  bot.fuelSlot = data.fuelSlot
+  bot.minFuel = data.minFuel
+  bot.pos = Vector:deserialize(data.pos)
+  bot.start = Vector:deserialize(data.start)
+  bot.aa = AA:deserialize(data.aa)
+
+  return bot
+end
+
+function Bot:serialize()
+  return {
+    fuelSlot = self.fuelSlot,
+    minFuel = self.minFuel,
+    pos = self.pos:serialize(),
+    start = self.start:serialize(),
+    dir = self.dir,
+    aa = self.aa:serialize(),
+  }
+end
+
 function Bot:clearAA()
   self.aa:clear()
   self:cacheAround()
