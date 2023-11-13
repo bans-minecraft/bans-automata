@@ -29,7 +29,6 @@ Log.setLogFile("storage-log.txt")
 
 local STORAGE_SET_WIDTH = 4
 local STORAGE_SET_HEIGHT = 3
-local STORAGE_SET_GAP = 2
 local STORAGE_SETS_ROWS = 3 -- In the North-South direction
 local STORAGE_SETS_COLS = 3 -- In the East-West direction
 
@@ -458,77 +457,6 @@ function StoreBot:scanDrawers(side, set_coord)
 
   return true
 end
-
--- function StoreBot:scanDrawersOld(side, set_coord)
---   local ok, err
---
---   local start = self.bot.pos:clone()
---   local drawer_set = self:getDrawerSet(set_coord)
---   Log.assertClass(drawer_set, DrawerSet)
---
---   for row = 1, STORAGE_SET_HEIGHT do
---     -- Move down to the next row
---     ok, err = self:down()
---     if not ok then
---       Log.error("Unable to move down to next row:", err)
---       return false, "Unable to move row"
---     end
---
---     for col = 1, STORAGE_SET_WIDTH do
---       -- Move along to the next col
---       if col > 1 then
---         ok, err = self:forward()
---         if not ok then
---           Log.error("Unable to move forward to next column:", err)
---           return false, "Unable to move to column"
---         end
---       end
---
---       -- Face the drawer: we face the opposite direction to the side of the drawer set
---       if side == "east" then
---         ok, err = self.bot:face(Direction.West)
---       elseif side == "west" then
---         ok, err = self.bot:face(Direction.East)
---       end
---
---       if not ok then
---         Log.error("Unable to face drawer:", err)
---         return false, "Unable to face drawer"
---       end
---
---       local drawer = drawer_set.drawers[side][row][col]
---       Log.assertClass(drawer, Drawer)
---       self:forgetLocationsForDrawer(drawer)
---       ok, err = drawer:inspect("front")
---       if not ok then
---         Log.error(("Failed to inspect storage at %d:%d on side %s in set %s"):format(row, col, side, set_coord))
---         return false, "Failed to inspect storage"
---       end
---
---       drawer.pos = self.bot.pos:clone()
---       self:addLocationsForDrawer(drawer)
---
---       -- Turn back away from the drawer
---       self.bot:face(Direction.North)
---     end
---
---     -- Move back to the beginning of the column
---     ok, err = self:move(Direction.seq():south(STORAGE_SET_WIDTH - 1):north(0))
---     if not ok then
---       Log.error("Unable to move back to beginning of column:", err)
---       return false, "Unable to move to beginning of column"
---     end
---   end
---
---   -- -- Move back to the start location
---   ok, err = self.bot:pathFind(start, 200)
---   if not ok then
---     Log.error("Failed to path find back to start:", err)
---     return false, "Failed to return to start"
---   end
---
---   return true
--- end
 
 function StoreBot:scanDrawerSet(coord)
   local start = self.bot.pos:clone()
