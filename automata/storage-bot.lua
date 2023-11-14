@@ -16,22 +16,20 @@
 -- to deal with my storage situation.
 --
 -- [2023-11-12] Initial version
+-- [2023-11-14] Optimize (and simplify) initial area scanning
+-- [2023-11-14] Improve scanning of area by not turning to storage drawers
 
 package.path = "/?.lua;/?/init.lua;" .. package.path
 local AANode = require("lib.bot.aa.node")
+local AAUtils = require("lib.bot.aa.utils")
+local AABB = require("lib.aabb")
 local Bot = require("lib.bot")
 local Log = require("lib.log")
 local Direction = require("lib.direction")
 local Utils = require("lib.utils")
 local Vector = require("lib.vector")
-local Coord = require("lib.coord")
 
-Log.setLogFile("storage-log.txt")
-
-local STORAGE_SET_WIDTH = 4
-local STORAGE_SET_HEIGHT = 3
-local STORAGE_SETS_ROWS = 3 -- In the North-South direction
-local STORAGE_SETS_COLS = 3 -- In the East-West direction
+Log.setLogFile("storage-bot.log", true)
 
 -----------------------------------------------------------------------------------------------
 
@@ -39,36 +37,44 @@ local Drawer = {}
 Drawer.__index = Drawer
 Drawer.__name = "Drawer"
 
-function Drawer:create(set, side, coord)
-  Log.assertClass(set, Coord)
-  Log.assertIs(side, "string")
-  Log.assertClass(coord, Coord)
+function Drawer:create(index, pos, dir, side)
+  Log.assertIs(index, "number")
+  Log.assertClass(pos, Vector)
+  Direction.assertDir(dir)
 
   local drawer = {}
   setmetatable(drawer, Drawer)
 
-  drawer.set = set
-  drawer.side = side
-  drawer.coord = coord
-  drawer.pos = Vector:create()
-  drawer.dir = 0
-  drawer.size = 0
+  drawer.index = index
+  drawer.pos = pos
+  drawer.dir = dir
+
+  local p = peripheral.wrap(side)
+  if not p then
+    Log.error(("Unable to wrap peripheral on side %s of bot"):format(side))
+    return false, "Unable to wrap peripheral on " .. side
+  end
+
+  drawer.size = p.size()
   drawer.slots = {}
+  for slot, item in pairs(p.list()) do
+    drawer.slots[slot] = item.name
+  end
 
   return drawer
 end
 
 function Drawer:deserialize(data)
   Log.assertIs(data, "table")
-  Log.assertIs(data.side, "string")
+  Log.assertIs(data.index, "number")
   Log.assertIs(data.dir, "number")
   Log.assertIs(data.size, "number")
   Log.assertIs(data.slots, "table")
 
-  local set = Coord:deserialize(data.set)
-  local coord = Coord:deserialize(data.coord)
-  local drawer = Drawer:create(set, data.side, coord)
+  local drawer = {}
+  setmetatable(drawer, Drawer)
 
+  drawer.index = data.index
   drawer.pos = Vector:deserialize(data.pos)
   drawer.dir = data.dir
   drawer.size = data.size
@@ -79,9 +85,7 @@ end
 
 function Drawer:serialize()
   return {
-    set = self.set:serialize(),
-    side = self.side,
-    coord = self.coord:serialize(),
+    index = self.index,
     pos = self.pos:serialize(),
     dir = self.dir,
     size = self.size,
@@ -90,18 +94,19 @@ function Drawer:serialize()
 end
 
 function Drawer:__tostring()
-  return ("%s/%s/%s"):format(self.set, self.side, self.coord)
+  return ("%s"):format(self.pos)
 end
 
-function Drawer:inspect(side)
-  if side == nil then
-    side = "front"
-  end
+function Drawer:getBotCoord()
+  -- Get the opposite direction that the bot faces for this drawer, then move in that direction
+  -- by one block. This gives us the location the bot should pathfind to for the drawer.
+  return Direction.offsetDirection(self.pos, Direction.opposite(self.dir), 1)
+end
 
-  Log.assertIs(side, "string")
-  local drawer = peripheral.wrap(side)
+function Drawer:inspect()
+  local drawer = peripheral.wrap("front")
   if not drawer then
-    Log.error("Unable to wrap peripheral on side:", side)
+    Log.error("Unable to wrap peripheral infront of bot")
     return false, "Unable to wrap peripheral"
   end
 
@@ -116,71 +121,11 @@ end
 
 -----------------------------------------------------------------------------------------------
 
-local DrawerSet = {}
-DrawerSet.__index = DrawerSet
-DrawerSet.__name = "DrawerSet"
-
-function DrawerSet:create(coord)
-  Log.assertClass(coord, Coord)
-
-  local set = {}
-  setmetatable(set, DrawerSet)
-
-  set.coord = coord
-  set.drawers = {
-    east = {},
-    west = {},
-  }
-
-  for row = 1, STORAGE_SET_HEIGHT do
-    set.drawers.east[row] = {}
-    set.drawers.west[row] = {}
-
-    for col = 1, STORAGE_SET_WIDTH do
-      set.drawers.east[row][col] = Drawer:create(set.coord:clone(), "east", Coord:create(row, col))
-      set.drawers.west[row][col] = Drawer:create(set.coord:clone(), "west", Coord:create(row, col))
-    end
-  end
-
-  return set
-end
-
-function DrawerSet:serialize()
-  local east = {}
-  local west = {}
-
-  for row = 1, STORAGE_SET_HEIGHT do
-    east[row] = {}
-    west[row] = {}
-
-    for col = 1, STORAGE_SET_WIDTH do
-      east[row][col] = self.drawers.east[row][col]:serialize()
-      west[row][col] = self.drawers.west[row][col]:serialize()
-    end
-  end
-
-  return {
-    coord = self.coord:serialize(),
-    drawers = {
-      east = east,
-      west = west,
-    },
-  }
-end
-
-function DrawerSet:deserialize(data)
-  Log.assertIs(data, "table")
-
-  local set = DrawerSet:create(Coord:deserialize(data.coord))
-
-  for row = 1, STORAGE_SET_HEIGHT do
-    for col = 1, STORAGE_SET_WIDTH do
-      set.drawers.east[row][col] = Drawer:deserialize(data.drawers.east[row][col])
-      set.drawers.west[row][col] = Drawer:deserialize(data.drawers.west[row][col])
-    end
-  end
-
-  return set
+local function createArea()
+  local area = AABB:create()
+  area:addPoint(-4, 1, -19)
+  area:addPoint(11, 3, -1)
+  return area
 end
 
 -----------------------------------------------------------------------------------------------
@@ -189,110 +134,101 @@ local StoreBot = {}
 StoreBot.__index = StoreBot
 StoreBot.__name = "StoreBot"
 
+StoreBot.MIN_FUEL = 2000
+
 function StoreBot:create()
   local bot = {}
   setmetatable(bot, StoreBot)
 
+  bot.area = createArea()
   bot.bot = Bot:create(Direction.North)
-  bot.drawerSets = {}
-  bot.itemLocations = {}
   bot.home = bot.bot.pos:clone()
-
-  for row = 1, STORAGE_SETS_ROWS do
-    for col = 1, STORAGE_SETS_COLS do
-      table.insert(bot.drawerSets, DrawerSet:create(Coord:create(row, col)))
-    end
-  end
+  bot.drawers = {}
+  bot.items = {}
 
   return bot
 end
 
+-----------------------------------------------------------------------------------------------
+
 function StoreBot:save()
-  local drawer_sets = {}
-  for _, drawer_set in ipairs(self.drawerSets) do
-    table.insert(drawer_sets, drawer_set:serialize())
+  local drawers = {}
+  for _, drawer in ipairs(self.drawers) do
+    table.insert(drawers, drawer:serialize())
   end
 
-  local file = fs.open("storage-bot.data", "w")
+  local file = fs.open(".storage-bot.data", "w")
+
   file.write(textutils.serialize({
-    home = self.home:serialize(),
     bot = self.bot:serialize(),
-    drawerSets = drawer_sets,
+    home = self.home:serialize(),
+    drawers = drawers,
   }))
+
   file.close()
 end
 
 function StoreBot:load()
-  local file = fs.open("storage-bot.data", "r")
+  local file = fs.open(".storage-bot.data", "r")
   local text = file.readAll()
   local data = textutils.unserialize(text)
   file.close()
 
   if not data then
     Log.error("Failed to read storage bot data")
-    return false, "Failed to read storage bot data"
+    return nil, "Failed to read storage bot data"
   end
 
   Log.assertIs(data, "table")
-  self.home = Vector:deserialize(data.home)
-  self.bot = Bot:deserialize(data.bot)
 
-  self.drawerSets = {}
-  self.itemLocations = {}
+  local bot = {}
+  setmetatable(bot, StoreBot)
+
+  bot.area = createArea()
+  bot.bot = Bot:deserialize(data.bot)
+  bot.home = Vector:deserialize(data.home)
+  bot.drawers = {}
+  bot.items = {}
 
   local ndrawers = 0
   local nitems = 0
-  for _, set_data in ipairs(data.drawerSets) do
-    local drawer_set = DrawerSet:deserialize(set_data)
-    table.insert(self.drawerSets, drawer_set)
 
-    for row = 1, STORAGE_SET_HEIGHT do
-      for col = 1, STORAGE_SET_WIDTH do
-        nitems = nitems + self:addLocationsForDrawer(drawer_set.drawers.east[row][col])
-        nitems = nitems + self:addLocationsForDrawer(drawer_set.drawers.west[row][col])
-        ndrawers = ndrawers + 2
+  for index, drawer_spec in ipairs(data.drawers) do
+    local drawer = Drawer:deserialize(drawer_spec)
+    for _, item in pairs(drawer.slots) do
+      if item then
+        bot.items[item] = index
+        nitems = nitems + 1
       end
     end
+
+    table.insert(bot.drawers, drawer)
+    ndrawers = ndrawers + 1
   end
 
-  Log.info(("Loaded %d drawers over %d drawer sets"):format(ndrawers, #self.drawerSets))
-  Log.info(("Loaded locations for %d items"):format(nitems))
-
-  return true
+  Log.info(("Loaded %d drawers with %d items"):format(ndrawers, nitems))
+  return bot
 end
 
-function StoreBot:getDrawerSet(coord)
-  Log.assertClass(coord, Coord)
-  Log.assert(coord.row >= 1 and coord.row <= STORAGE_SETS_ROWS, "row out of range")
-  Log.assert(coord.col >= 1 and coord.col <= STORAGE_SETS_COLS, "column out of range")
-  return self.drawerSets[coord:toIndex(STORAGE_SETS_COLS)]
-end
+-----------------------------------------------------------------------------------------------
 
 function StoreBot:forgetLocationsForDrawer(drawer)
   Log.assertClass(drawer, Drawer)
   for _, item in pairs(drawer.slots) do
-    self.itemLocations[item.name] = nil
+    self.items[item] = nil
   end
 end
 
 function StoreBot:addLocationsForDrawer(drawer)
   Log.assertClass(drawer, Drawer)
-  local count = 0
-  for slot, item in pairs(drawer.slots) do
+  for _, item in pairs(drawer.slots) do
     if item then
-      self.itemLocations[item.name] = {
-        set = drawer.set:clone(),
-        side = drawer.side,
-        coord = drawer.coord:clone(),
-        slot = slot,
-      }
-
-      count = count + 1
+      self.items[item] = drawer.index
     end
   end
-
-  return count
 end
+
+-----------------------------------------------------------------------------------------------
 
 function StoreBot:receiveFuel()
   -- Check to see if we need fuel
@@ -347,274 +283,49 @@ function StoreBot:refuelIfNeeded()
     return true
   end
 
-  if fuel_level < Bot.MIN_FUEL then
+  if fuel_level < StoreBot.MIN_FUEL then
     Log.info("Bot fuel level is low, attempting to refuel")
     return self:receiveFuel()
   else
-    Log.info(("Bot fuel level %d is above minimum %d"):format(fuel_level, Bot.MIN_FUEL))
+    Log.info(("Bot fuel level %d is above minimum %d"):format(fuel_level, StoreBot.MIN_FUEL))
   end
 
   return true
 end
 
-function StoreBot:up(count)
-  count = Utils.numberOrDefault(count, 1)
-  while count > 0 do
-    local ok, err = self.bot:up()
-    if not ok then
-      return false, err
-    end
+-----------------------------------------------------------------------------------------------
 
-    count = count - 1
-  end
-
-  return true
+function StoreBot:targetBlockInRange(block)
+  return self.area:contains(block.x, block.y, block.z)
 end
 
-function StoreBot:down(count)
-  count = Utils.numberOrDefault(count, 1)
-  while count > 0 do
-    local ok, err = self.bot:down()
-    if not ok then
-      return false, err
-    end
+function StoreBot:scanSurrounding()
+  local result = {}
 
-    count = count - 1
-  end
+  local queries = {
+    { self.bot:queryForward(false), self.bot.dir },
+    { self.bot:queryLeft(false), self.bot:leftDirection() },
+    { self.bot:queryRight(false), self.bot:rightDirection() },
+    { self.bot:queryUp(), Direction.Up },
+    { self.bot:queryDown(), Direction.Down },
+  }
 
-  return true
-end
-
-function StoreBot:forward(count)
-  count = Utils.numberOrDefault(count, 1)
-  while count > 0 do
-    local ok, err = self.bot:forward()
-    if not ok then
-      return false, err
-    end
-
-    count = count - 1
-  end
-
-  return true
-end
-
-function StoreBot:backward(count)
-  count = Utils.numberOrDefault(count, 1)
-  while count > 0 do
-    local ok, err = self.bot:backward()
-    if not ok then
-      return false, err
-    end
-
-    count = count - 1
-  end
-
-  return true
-end
-
-function StoreBot:move(steps)
-  local ok, err
-
-  Log.assertIs(steps, "table")
-  if steps.__index == Direction.DirSeq then
-    steps = steps:finish()
-  end
-
-  for _, step in ipairs(steps) do
-    if step.direction == Direction.Up then
-      ok, err = self:up(step.count)
-      if not ok then
-        Log.error(("Unable to move up %d steps: %s"):format(step.count, err))
-        return false, "Unable to move up: " .. err
-      end
-    elseif step.direction == Direction.Down then
-      ok, err = self:down(step.count)
-      if not ok then
-        Log.error(("Unable to move down %d steps: %s"):format(step.count, err))
-        return false, "Unable to move down: " .. err
-      end
-    else
-      ok, err = self.bot:face(step.direction)
-      if not ok then
-        Log.error(("Unable to turn to face direction %s: %s"):format(Direction.dirName(step.direction), err))
-        return false, "Unable to turn: " .. err
-      end
-
-      if step.count > 0 then
-        ok, err = self:forward(step.count)
-        if not ok then
-          Log.error(("Unable to move forward %d steps: %s"):format(step.count, err))
-          return false, "Unable to move: " .. err
-        end
+  for _, query in ipairs(queries) do
+    local node, direction = table.unpack(query)
+    if node.state == AANode.EMPTY then
+      local target = Direction.offsetDirection(self.bot.pos, direction, 1)
+      if self:targetBlockInRange(target) then
+        table.insert(result, target)
       end
     end
   end
 
-  return true
+  return result
 end
 
-local COLSCAN_DIR = {
-  { StoreBot.forward, 1, 1 },
-  { StoreBot.backward, STORAGE_SET_WIDTH, -1 },
-}
-
-function StoreBot:scanDrawers(side, set_coord)
-  local ok, err
-
-  local start = self.bot.pos:clone()
-  local drawer_set = self:getDrawerSet(set_coord)
-  Log.assertClass(drawer_set, DrawerSet)
-
-  local face_dir
-  if side == "east" then
-    face_dir = Direction.West
-  elseif side == "west" then
-    face_dir = Direction.East
-  end
-
-  local dir = 1
-
-  for row = 1, STORAGE_SET_HEIGHT do
-    -- Move down to the next row
-    ok, err = self:down()
-    if not ok then
-      Log.error("Unable to move down to next row:", err)
-      return false, "Unable to move row"
-    end
-
-    local colscan = COLSCAN_DIR[dir]
-    local count = STORAGE_SET_WIDTH
-    local col = colscan[2]
-
-    while count > 0 do
-      ok, err = self.bot:face(face_dir)
-      if not ok then
-        Log.error("Unable to face drawer:", err)
-        return false, "Unable to face drawer"
-      end
-
-      local drawer = drawer_set.drawers[side][row][col]
-      Log.assertClass(drawer, Drawer)
-      self:forgetLocationsForDrawer(drawer)
-      ok, err = drawer:inspect("front")
-      if not ok then
-        Log.error(("Failed to inspect storage at %d:%d on side %s in set %s"):format(row, col, side, set_coord))
-        return false, "Failed to inspect storage"
-      end
-
-      drawer.pos = self.bot.pos:clone()
-      drawer.dir = self.bot.dir
-      self:addLocationsForDrawer(drawer)
-
-      -- Turn back away from the drawer
-      self.bot:face(Direction.North)
-
-      if count > 1 then
-        ok, err = colscan[1](self)
-        if not ok then
-          Log.error(
-            ("Failed to move %s after inspecting storage at %d:%d on side %s in set %s: %s"):format(
-              dir,
-              row,
-              col,
-              side,
-              set_coord
-            )
-          )
-        end
-      end
-
-      count = count - 1
-      col = col + colscan[3]
-    end
-
-    dir = 1 + dir % 2
-  end
-
-  -- -- Move back to the start location
-  ok, err = self.bot:pathFind(start, 200)
-  if not ok then
-    Log.error("Failed to path find back to start:", err)
-    return false, "Failed to return to start"
-  end
-
-  return true
+local function isStorageDrawer(item)
+  return Utils.stringStartsWith(item.name, "storagedrawers:")
 end
-
-function StoreBot:scanDrawerSet(coord)
-  local start = self.bot.pos:clone()
-  local ok, err
-
-  -- Scan all the drawers on the right (west)
-  ok, err = self:scanDrawers("west", coord)
-  if not ok then
-    Log.error("Failed to scan west drawers:", err)
-    return false, "Failed to scan west drawers"
-  end
-
-  -- Move to the other side
-  ok, err = self:move(Direction.seq():south(1):east(3):north(1))
-  if not ok then
-    Log.error("Failed to move to east side of drawer set:", err)
-    return false, "Failed to move to east drawers"
-  end
-
-  -- Scan all the drawers on the left (east)
-  ok, err = self:scanDrawers("east", coord)
-  if not ok then
-    Log.error("Failed to scan east drawers:", err)
-    return false, "Failed to scan east drawers"
-  end
-
-  -- Move back to the start location
-  ok, err = self.bot:pathFind(start, 200)
-  if not ok then
-    Log.error("Failed to path find back to start:", err)
-    return false, "Failed to return to start"
-  end
-
-  return true
-end
-
-local STORAGE_SETS_SCAN = {
-  {
-    coord = Coord:create(1, 1),
-    move = Direction.seq():up(4):north(2):west(3):north(1):finish(),
-  },
-  {
-    coord = Coord:create(1, 2),
-    move = Direction.seq():north(6):finish(),
-  },
-  {
-    coord = Coord:create(1, 3),
-    move = Direction.seq():north(6):finish(),
-  },
-  {
-    coord = Coord:create(2, 3),
-    move = Direction.seq():south(1):east(5):north(1):finish(),
-  },
-  {
-    coord = Coord:create(2, 2),
-    move = Direction.seq():south(6):north(0):finish(),
-  },
-  {
-    coord = Coord:create(2, 1),
-    move = Direction.seq():south(6):north(0):finish(),
-  },
-  {
-    coord = Coord:create(3, 1),
-    move = Direction.seq():south(1):east(5):north(1):finish(),
-  },
-  {
-    coord = Coord:create(3, 2),
-    move = Direction.seq():north(6):finish(),
-  },
-  {
-    coord = Coord:create(3, 3),
-    move = Direction.seq():north(6):finish(),
-  },
-}
 
 function StoreBot:scan()
   local ok, err
@@ -625,20 +336,72 @@ function StoreBot:scan()
     return false, "Failed to refuel bot"
   end
 
-  self.itemLocations = {}
-  for _, set in ipairs(STORAGE_SETS_SCAN) do
-    Log.info("Scanning drawer set", set.coord)
+  -- Move up from our starting position
+  ok, err = self.bot:up(2)
+  if not ok then
+    return false, "Failed to move up"
+  end
 
-    ok, err = self:move(set.move)
+  -- We maintain a stack of empty locations to visit. These are the locations in our AA in
+  -- which we've found air (or whatever) into which the bot can move. Each entry in the
+  -- stack is the location of the block.
+  local stack = {}
+  local visited = {}
+  local found = {}
+
+  -- Push the initial scan onto the stack
+  Utils.concat(stack, self:scanSurrounding())
+
+  while #stack > 0 do
+    -- Get the target block from the top of the stack.
+    local target = table.remove(stack, #stack)
+
+    -- Move the bot into the target block
+    ok, err = self.bot:pathFind(target, 200)
     if not ok then
-      Log.error("Failed to move to storage drawer set", set.coord)
-      return false, "Failed to move to storage drawer set"
+      Log.error(("Failed to pathfind to block at %s: %s"):format(target, err))
+      return false, err
     end
 
-    ok, err = self:scanDrawerSet(set.coord)
-    if not ok then
-      Log.error("Failed to scan drawer set:", err)
-      return false, "Failed to scan drawer set"
+    -- Record this block in the "visited" set
+    visited[AAUtils.positionKey(target)] = true
+
+    for _, direction in ipairs({ Direction.East, Direction.West }) do
+      -- See if there is a node there that looks like a storage drawer
+      local node = self.bot:query(direction)
+      if node.state == AANode.FULL and isStorageDrawer(node.info) then
+        local drawer_pos = self.bot:relativePosition(direction)
+        local drawer_key = AAUtils.positionKey(drawer_pos)
+
+        -- See if we have already seen this drawer
+        if found[drawer_key] == nil then
+          -- Create the new drawer and add it to the set of drawers
+          local side = Direction.directionSide(self.bot.dir, direction)
+          local drawer = Drawer:create(#self.drawers + 1, drawer_pos, direction, side)
+          table.insert(self.drawers, drawer)
+
+          -- Record that we have seen this drawer
+          found[drawer_key] = true
+
+          -- Report that we found a drawer
+          Log.info(("Discovered drawer at %s with %i slots:"):format(drawer.pos, #drawer.slots))
+          for index, item in pairs(drawer.slots) do
+            if item then
+              Log.info(("    slot[%d] = %s"):format(index, item))
+            end
+          end
+        end
+      end
+    end
+
+    -- Perform a new scan of the blocks around us to find empty blocks
+    local scan = self:scanSurrounding()
+
+    -- Add the new scanned blocks if they're not present in the visited set
+    for _, block in ipairs(scan) do
+      if visited[AAUtils.positionKey(block)] == nil then
+        table.insert(stack, block)
+      end
     end
   end
 
@@ -658,6 +421,8 @@ function StoreBot:scan()
   self:save()
   return true
 end
+
+-----------------------------------------------------------------------------------------------
 
 function StoreBot:fetchInput()
   local ok, err = self.bot:face(Direction.West)
@@ -734,33 +499,26 @@ function StoreBot:loop()
   for slot = 1, 16 do
     local info = turtle.getItemDetail(slot)
     if info then
-      local loc = self.itemLocations[info.name]
-      if loc then
-        Log.info(
-          ("Storing %dx %s in drawer %s on %s side of set %s"):format(
-            info.count,
-            info.name,
-            loc.coord,
-            loc.side,
-            loc.set
-          )
-        )
+      local loc = self.items[info.name]
+      if type(loc) == "number" then
+        local drawer = self.drawers[loc]
+        Log.info(("Storing %dx %s in drawer %s"):format(info.count, info.name, drawer.pos))
 
-        local drawer_set = self:getDrawerSet(loc.set)
-        local drawer = drawer_set.drawers[loc.side][loc.coord.row][loc.coord.col]
-
-        ok, err = self.bot:pathFind(drawer.pos)
+        -- Move the bot over to the block infront of the drawer
+        ok, err = self.bot:pathFind(drawer:getBotCoord())
         if not ok then
           Log.error("Failed to pathfind to storage drawer:", err)
           return false, "Failed to pathfind to storage drawer"
         end
 
+        -- Turn the bot to face the drawer so we can interact with it
         ok, err = self.bot:face(drawer.dir)
         if not ok then
           Log.error("Failed to face storage drawer:", err)
           return false, "Failed to face storage drawer"
         end
 
+        -- Drop the items in this slot into the drawer
         turtle.select(slot)
         turtle.drop()
       else
@@ -786,17 +544,8 @@ function StoreBot:loop()
 end
 
 function StoreBot:run()
-  local ok, err
-
-  -- Load the data for the bot
-  ok, err = self:load()
-  if not ok then
-    Log.error("Failed to load bot data:", err)
-    return false, "Failed to load bot data"
-  end
-
   while true do
-    ok, err = self:loop()
+    local ok, err = self:loop()
     if not ok then
       Log.error("Main bot loop failed:", err)
       return false, "Main bot loop failed"
@@ -806,15 +555,17 @@ end
 
 local function main(...)
   local args = { ... }
-  local bot = StoreBot:create()
   local ok, err
 
   if #args == 0 then
+    local bot = StoreBot:load()
     ok, err = bot:run()
   elseif #args == 1 then
     if args[1] == "run" then
+      local bot = StoreBot:load()
       ok, err = bot:run()
     elseif args[1] == "scan" then
+      local bot = StoreBot:create()
       ok, err = bot:scan()
     else
       error("Unknown command: " .. args[1])

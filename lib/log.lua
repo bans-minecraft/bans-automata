@@ -9,8 +9,11 @@ M.level = {
 
 M.logfile = nil
 
-M.setLogFile = function(name)
+M.setLogFile = function(name, fresh)
   M.logfile = name
+  if fresh and fs.exists(name) then
+    fs.delete(name)
+  end
 end
 
 M.write = function(level, message)

@@ -62,6 +62,20 @@ M.dirName = function(dir)
   return DIR_NAMES[dir]
 end
 
+local DIR_OPPOSITES = {}
+DIR_OPPOSITES[M.North] = M.South
+DIR_OPPOSITES[M.South] = M.North
+DIR_OPPOSITES[M.East] = M.West
+DIR_OPPOSITES[M.West] = M.East
+DIR_OPPOSITES[M.Up] = M.Down
+DIR_OPPOSITES[M.Down] = M.Up
+
+-- Get the opposite direction
+M.opposite = function(dir)
+  M.assertDir(dir)
+  return DIR_OPPOSITES[dir]
+end
+
 -- Offset a vector in a direction with a given scale.
 --
 -- For any valid direction `dir`, this function will scale the direction vector by the number `d`
@@ -99,6 +113,14 @@ end
 
 M.parseDirection = function(name)
   return DIR_ALIASES[name]
+end
+
+local SIDE_INDICES = { "left", "back", "right", "front" }
+
+M.directionSide = function(facing, direction)
+  M.assertDir(facing)
+  M.assertDir(direction)
+  return SIDE_INDICES[1 + (direction - facing + 3) % 4]
 end
 
 local DirSeqStep = {}

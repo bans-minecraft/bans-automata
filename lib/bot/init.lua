@@ -1,5 +1,6 @@
 local Direction = require("lib.direction")
 local Vector = require("lib.vector")
+local Utils = require("lib.utils")
 local Log = require("lib.log")
 local AA = require("lib.bot.aa")
 local AANode = require("lib.bot.aa.node")
@@ -309,52 +310,118 @@ function Bot:face(dir)
   return true
 end
 
-function Bot:up()
-  local ok, err = turtle.up()
-  if ok then
+function Bot:up(count)
+  count = Utils.numberOrDefault(count, 1)
+
+  local move = 0
+  while move < count do
+    local ok, err = turtle.up()
+    if not ok then
+      self:cacheBlockUp()
+      return false, err, move, count
+    end
+
     self.pos = Direction.offsetDirection(self.pos, Direction.Up)
     self:cacheBlocks()
-    return true
+    move = move + 1
   end
 
-  self:cacheBlockUp()
-  return false, err
+  return true
 end
 
-function Bot:down()
-  local ok, err = turtle.down()
-  if ok then
+function Bot:down(count)
+  count = Utils.numberOrDefault(count, 1)
+
+  local move = 0
+  while move < count do
+    local ok, err = turtle.down()
+    if not ok then
+      self:cacheBlockDown()
+      return false, err, move, count
+    end
+
     self.pos = Direction.offsetDirection(self.pos, Direction.Down)
     self:cacheBlocks()
-    return true
+    move = move + 1
   end
 
-  self:cacheBlockDown()
-  return false, err
+  return true
 end
 
-function Bot:forward()
-  local ok, err = turtle.forward()
-  if ok then
+function Bot:forward(count)
+  count = Utils.numberOrDefault(count, 1)
+
+  local move = 0
+  while move < count do
+    local ok, err = turtle.forward()
+    if not ok then
+      self:cacheBlockFront()
+      return false, err, move, count
+    end
+
     self.pos = Direction.offsetDirection(self.pos, self.dir)
     self:cacheBlocks()
-    return true
+    move = move + 1
   end
 
-  self:cacheBlockFront()
-  return false, err
+  return true
 end
 
-function Bot:backward()
-  local ok, err = turtle.back()
-  if ok then
+function Bot:backward(count)
+  count = Utils.numberOrDefault(count, 1)
+
+  local move = 0
+  while move < count do
+    local ok, err = turtle.back()
+    if not ok then
+      self:cacheBlockFront()
+      return false, err, move, count
+    end
+
     self.pos = Direction.offsetDirection(self.pos, self.dir, -1)
     self:cacheBlocks()
-    return true
+    move = move + 1
   end
 
-  self:cacheBlockFront()
-  return false, err
+  return true
+end
+
+function Bot:move(steps)
+  local ok, err, move, count
+
+  Log.assertIs(steps, "table")
+  if steps.__index == Direction.DirSeq then
+    steps = steps:finish()
+  end
+
+  for index, step in ipairs(steps) do
+    if step.direction == Direction.Up then
+      ok, err, move, count = self:up(step.count)
+      if not ok then
+        return false, ("Unable to move up in step %d (moved %d of %d): %s"):format(index, move, count, err)
+      end
+    elseif step.direction == Direction.Down then
+      ok, err, move, count = self:down(step.count)
+      if not ok then
+        return false, ("Unable to move down in step %d (moved %d of %d): %s"):format(index, move, count, err)
+      end
+    else
+      ok, err = self:face(step.direction)
+      if not ok then
+        return false,
+          ("Unable to turn to face direction %s in step %d: %s"):format(Direction.dirName(step.direction), index, err)
+      end
+
+      if step.count > 0 then
+        ok, err, move, count = self:forward(step.count)
+        if not ok then
+          return false, ("Unable to move forward in step %d (moved %d of %d): %s"):format(index, move, count, err)
+        end
+      end
+    end
+  end
+
+  return true
 end
 
 function Bot:pathFind(target, limit)
