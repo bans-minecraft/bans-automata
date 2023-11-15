@@ -40,4 +40,7 @@ luac.out
 *.x86_64
 *.hex
 
-
+# Stuff for bots and so on
+*.log
+*.data
+*.data.bkp
