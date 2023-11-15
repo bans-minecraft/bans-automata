@@ -15,9 +15,45 @@
 -- This was created after I found that the Starbuncles (from Ars Nouveau mod) were not really able
 -- to deal with my storage situation.
 --
+-- The bot is configured with a storage area: a bounding-box in which there should be one or more
+-- storage drawers. A constraint is placed on these storage drawers that they should be accessible
+-- from either the east or west sides.
+--
+-- The bot resides next to both its input and fuel inventories. The input inventory is placed on
+-- the left of the bot, and the fuel inventory is placed infront. Every minute, the bot checks the
+-- input inventory for items and, if there are any, extracts as much as it can carry. The bot will
+-- then visit the corresponding storage drawer for each item, placing the items into storage. Once
+-- completed, the bot will return to its resting location and check the input inventory. If there
+-- are more items the process of placing the items into storage will begin again; otherwise the
+-- bot will go back to sleep for another minute.
+--
+-- In order to build a map of all the stoarge drawers in the region, the bot can be run with the
+-- "scan" argument. This will cause the bot to walk through the entire area, noting down the
+-- location and contents of any storage drawers it finds. Note that this process can take a very
+-- long time for larger areas, as the bot needs to be thorough.
+--
+-- Whilst the bot is looking around for storage drawers, it is also building a mantal map of the
+-- area, which is stored in the AA graph. This is then used along with the A* algorithm to allow
+-- the bot to pathfind to each storage drawer.
+--
+-- The bot can also be run with the "update" argument. This will cause the bot to revisit all the
+-- storage drawers it knows about and update its knowledge of their contents. This is useful if
+-- you rearrange the contents of the storage drawers, but do not change their spacial
+-- configuration such that a new "scan" needs to be run. It is much more efficient to just visit
+-- all the known storage drawers and check their contents.
+--
+-- The bot creates to files:
+--
+-- - storage-bot.log which contains all the log output from the bot. Any errors and so on will
+--   be recorded here.
+-- - .storage-bot.data contains a Lua-serialized dump of the bot's AA and other internals that
+--   were constructed during the "scan" process. This file, which can get quite large, contains
+--   all the bots memories.
+--
 -- [2023-11-12] Initial version
 -- [2023-11-14] Optimize (and simplify) initial area scanning
 -- [2023-11-14] Improve scanning of area by not turning to storage drawers
+-- [2023-11-15] Added the "update" command
 
 package.path = "/?.lua;/?/init.lua;" .. package.path
 local AANode = require("lib.bot.aa.node")
@@ -48,17 +84,12 @@ function Drawer:create(index, pos, dir, side)
   drawer.index = index
   drawer.pos = pos
   drawer.dir = dir
-
-  local p = peripheral.wrap(side)
-  if not p then
-    Log.error(("Unable to wrap peripheral on side %s of bot"):format(side))
-    return false, "Unable to wrap peripheral on " .. side
-  end
-
-  drawer.size = p.size()
+  drawer.size = 0
   drawer.slots = {}
-  for slot, item in pairs(p.list()) do
-    drawer.slots[slot] = item.name
+
+  local ok, err = drawer:update(side)
+  if not ok then
+    return nil, err
   end
 
   return drawer
@@ -103,17 +134,17 @@ function Drawer:getBotCoord()
   return Direction.offsetDirection(self.pos, Direction.opposite(self.dir), 1)
 end
 
-function Drawer:inspect()
-  local drawer = peripheral.wrap("front")
+function Drawer:update(side)
+  local drawer = peripheral.wrap(side)
   if not drawer then
-    Log.error("Unable to wrap peripheral infront of bot")
-    return false, "Unable to wrap peripheral"
+    Log.error(("Unable to wrap peripheral on %s side of bot"):format(side))
+    return false, "Unable to wrap peripheral on " .. side
   end
 
   self.size = drawer.size()
   self.slots = {}
   for slot, item in pairs(drawer.list()) do
-    self.slots[slot] = item
+    self.slots[slot] = item.name
   end
 
   return true
@@ -210,22 +241,17 @@ function StoreBot:load()
   return bot
 end
 
------------------------------------------------------------------------------------------------
-
-function StoreBot:forgetLocationsForDrawer(drawer)
-  Log.assertClass(drawer, Drawer)
-  for _, item in pairs(drawer.slots) do
-    self.items[item] = nil
-  end
-end
-
 function StoreBot:addLocationsForDrawer(drawer)
   Log.assertClass(drawer, Drawer)
+  local nitems = 0
   for _, item in pairs(drawer.slots) do
     if item then
       self.items[item] = drawer.index
+      nitems = nitems + 1
     end
   end
+
+  return nitems
 end
 
 -----------------------------------------------------------------------------------------------
@@ -286,8 +312,8 @@ function StoreBot:refuelIfNeeded()
   if fuel_level < StoreBot.MIN_FUEL then
     Log.info("Bot fuel level is low, attempting to refuel")
     return self:receiveFuel()
-  else
-    Log.info(("Bot fuel level %d is above minimum %d"):format(fuel_level, StoreBot.MIN_FUEL))
+    -- else
+    --   Log.info(("Bot fuel level %d is above minimum %d"):format(fuel_level, StoreBot.MIN_FUEL))
   end
 
   return true
@@ -380,6 +406,9 @@ function StoreBot:scan()
           local drawer = Drawer:create(#self.drawers + 1, drawer_pos, direction, side)
           table.insert(self.drawers, drawer)
 
+          -- Add the items from the drawer into our memory
+          self:addLocationsForDrawer(drawer)
+
           -- Record that we have seen this drawer
           found[drawer_key] = true
 
@@ -424,6 +453,65 @@ end
 
 -----------------------------------------------------------------------------------------------
 
+function StoreBot:update()
+  local ok, err
+  local ndrawers = 0
+  local nitems = 0
+
+  -- Clear out the items map
+  self.items = {}
+
+  -- Iterate over all our storage drawers
+  for _, drawer in ipairs(self.drawers) do
+    Log.info(("Checking storage drawer %s"):format(drawer.pos))
+
+    -- Pathfind to the storage drawer
+    ok, err = self.bot:pathFind(drawer:getBotCoord())
+    if not ok then
+      Log.error("Failed to pathfind to storage drawer:", err)
+      return false, "Failed to pathfind to storage drawer"
+    end
+
+    -- Turn the bot to face the drawer so we can interact with it.
+    ok, err = self.bot:face(drawer.dir)
+    if not ok then
+      Log.error("Failed to face storage drawer:", err)
+      return false, "Failed to face storage drawer"
+    end
+
+    -- Update the drawer
+    ok, err = drawer:update("front")
+    if not ok then
+      Log.error("Failed to update storage drawer contents:", err)
+      return false, "Failed to update storage drawer"
+    end
+
+    -- Add the items from the drawer into our memory
+    nitems = nitems + self:addLocationsForDrawer(drawer)
+    ndrawers = ndrawers + 1
+  end
+
+  Log.info(("Updated information on %d drawers with %d items"):format(ndrawers, nitems))
+
+  -- Return to the home location
+  ok, err = self.bot:pathFind(self.home, 200)
+  if not ok then
+    Log.error("Failed to path find back to start:", err)
+    return false, "Failed to return to start"
+  end
+
+  ok, err = self.bot:face(Direction.North)
+  if not ok then
+    Log.error("Failed to face north:", err)
+    return false, "Failed to face north"
+  end
+
+  self:save()
+  return true
+end
+
+-----------------------------------------------------------------------------------------------
+
 function StoreBot:fetchInput()
   local ok, err = self.bot:face(Direction.West)
   if not ok then
@@ -437,8 +525,8 @@ function StoreBot:fetchInput()
     return nil, "Failed to wrap peripheral for input chest"
   end
 
-  local size = chest.size()
-  Log.info(("Input chest has %d slots"):format(size))
+  -- local size = chest.size()
+  -- Log.info(("Input chest has %d slots"):format(size))
 
   local received = 0
   local slot = 1
@@ -567,6 +655,9 @@ local function main(...)
     elseif args[1] == "scan" then
       local bot = StoreBot:create()
       ok, err = bot:scan()
+    elseif args[1] == "update" then
+      local bot = StoreBot:load()
+      ok, err = bot:update()
     else
       error("Unknown command: " .. args[1])
     end
