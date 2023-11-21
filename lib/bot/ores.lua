@@ -6,12 +6,12 @@
 local ORES_LIST = {
   "create:deepslate_zinc_ore",
   "create:zinc_ore",
-  "mekanism:deepslate_flourite_ore",
+  "mekanism:deepslate_fluorite_ore",
   "mekanism:deepslate_lead_ore",
   "mekanism:deepslate_osmium_ore",
   "mekanism:deepslate_tin_ore",
   "mekanism:deepslate_uranium_ore",
-  "mekanism:flourite_ore",
+  "mekanism:fluorite_ore",
   "mekanism:lead_ore",
   "mekanism:osmium_ore",
   "mekanism:tin_ore",
@@ -60,7 +60,7 @@ local ORES_LIST = {
   "thermal:niter_ore",
   "thermal:silver_ore",
   "thermal:sulfur_ore",
-  "thermal:tin_ore"
+  "thermal:tin_ore",
 }
 
 local ORES = {}
