@@ -8,7 +8,7 @@
 --                    | |
 --                    |_|
 --
--- strip-miner-v2.lua
+-- strip-miner.lua
 -- Copyright (C) 2023, Blake Rain.
 -- Licensed under the BSD3 License. See LICENSE for details.
 --
@@ -40,6 +40,7 @@
 -- [2023-06-17] Moved to Vector type to simplify more code
 -- [2023-06-17] Removed fuel-slot test in depositBlocks to avoid clogged fuel slot after mining
 -- [2023-06-18] Simplify ores lookup to use table rather than list
+-- [2023-11-21] Add function to drop unwanted items
 
 package.path = "/?.lua;/?/init.lua;" .. package.path
 local AANode = require("lib.bot.aa.node")
@@ -300,6 +301,25 @@ function Miner:findBranch()
   return false, "Branch limit reached"
 end
 
+local DROP = {
+  ["minecraft:tuff"] = true,
+  ["minecraft:deepslate"] = true,
+  ["minecraft:cobbled_deepslate"] = true,
+}
+
+function Miner:dropUnwanted()
+  -- Go through the bots inventory and check to see if we should keep each item. If the item is
+  -- something that we want to reject, then drop it.
+  for slot = 1, 16 do
+    local info = turtle.getItemDetail(slot)
+    if info and DROP[info.name] == true then
+      Log.info(("Dropping unwanted %ix %s"):format(info.count, info.name))
+      turtle.select(slot)
+      turtle.drop()
+    end
+  end
+end
+
 function Miner:excavationScan()
   local result = {}
 
@@ -466,6 +486,8 @@ function Miner:mineBranch(returning)
       )
       self.bot:face(start_dir)
     end
+
+    self:dropUnwanted()
   end
 
   return true
