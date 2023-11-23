@@ -316,6 +316,7 @@ local DROP = {
   ["minecraft:tuff"] = true,
   ["minecraft:deepslate"] = true,
   ["minecraft:cobbled_deepslate"] = true,
+  ["minecraft:gravel"] = true,
 }
 
 function Miner:dropUnwanted()
