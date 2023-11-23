@@ -41,6 +41,7 @@
 -- [2023-06-17] Removed fuel-slot test in depositBlocks to avoid clogged fuel slot after mining
 -- [2023-06-18] Simplify ores lookup to use table rather than list
 -- [2023-11-21] Add function to drop unwanted items
+-- [2023-11-23] Added more fuels
 
 package.path = "/?.lua;/?/init.lua;" .. package.path
 local AANode = require("lib.bot.aa.node")
@@ -71,6 +72,16 @@ function Miner:create(dir)
 
   return miner
 end
+
+local FUELS = {
+  ["minecraft:charcoal"] = true,
+  ["mekanism:block_charcoal"] = true,
+  ["quark:charcoal_block"] = true,
+  ["thermal:charcoal_block"] = true,
+
+  ["minecraft:coal"] = true,
+  ["minecraft:coal_block"] = true,
+}
 
 function Miner:receiveFuel()
   -- Check to see if we need fuel
@@ -105,7 +116,7 @@ function Miner:receiveFuel()
     return false
   end
 
-  if info.name ~= "minecraft:coal" then
+  if not FUELS[info.name] then
     Log.error("Unknown fuel " .. info.name .. " found in fuel slot (" .. self.bot.fuelSlot .. ")")
     turtle.select(1)
     return false
