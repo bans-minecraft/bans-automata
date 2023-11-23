@@ -119,7 +119,7 @@ function Miner:receiveFuel()
     return false
   end
 
-  local new_level = turtle.getFuellevel()
+  local new_level = turtle.getFuelLevel()
   Log.info(("Refuelled bot %d (current level: %d)"):format(new_level - level, new_level))
   return true
 end
