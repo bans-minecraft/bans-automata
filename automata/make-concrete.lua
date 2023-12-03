@@ -11,8 +11,7 @@ Log.setLogFile("concrete.log")
 
 local Location = {
   Home = "Home",
-  InsolatorInput = "InsolatorInput",
-  InsolatorOutput = "InsolatorOutput",
+  Insolator = "Insolator",
   SandStorage = "SandStorage",
 }
 
@@ -98,10 +97,8 @@ end
 function Maker:goHome()
   if self.location == Location.Home then
     return self
-  elseif self.location == Location.InsolatorInput then
-    return self:turnRight():forward():turnLeft():forward():turnLeft():backward():setLocation(Location.Home)
-  elseif self.location == Location.InsolatorOutput then
-    return self:turnLeft():forward():turnRight():forward():turnRight():backward():setLocation(Location.Home)
+  elseif self.location == Location.Insolator then
+    return self:backward():setLocation(Location.Home)
   elseif self.location == Location.SandStorage then
     return self:backward():turnRight():backward():setLocation(Location.Home)
   else
@@ -110,46 +107,13 @@ function Maker:goHome()
   end
 end
 
-function Maker:gotoInsolatorInput()
+function Maker:gotoInsolator()
   if self.location == Location.Home then
-    return self:forward():turnLeft():forward():turnRight():forward():turnRight():setLocation(Location.InsolatorInput)
-  elseif self.location == Location.InsolatorInput then
-    return self
-  elseif self.location == Location.InsolatorOutput then
-    return self
-      :turnLeft()
-      :forward()
-      :turnRight()
-      :forward(2)
-      :turnRight()
-      :forward()
-      :turnRight()
-      :setLocation(Location.InsolatorInput)
-  elseif self.location == Location.SandStorage then
-    return self:turnRight():forward():turnRight():setLocation(Location.InsolatorInput)
-  else
-    Log.error("Unrecognized location:", self.location)
-    return nil, "Unrecognized location"
-  end
-end
-
-function Maker:gotoInsolatorOutput()
-  if self.location == Location.Home then
-    return self:forward():turnRight():forward():turnLeft():forward():turnLeft():setLocation(Location.InsolatorOutput)
-  elseif self.location == Location.InsolatorInput then
-    return self
-      :turnRight()
-      :forward()
-      :turnLeft()
-      :forward(2)
-      :turnLeft()
-      :forward()
-      :turnLeft()
-      :setLocation(Location.InsolatorOutput)
-  elseif self.location == Location.InsolatorOutput then
+    return self:forward():setLocation(Location.Insolator)
+  elseif self.location == Location.Insolator then
     return self
   elseif self.location == Location.SandStorage then
-    return self:backward(2):turnRight():forward():turnLeft():setLocation(Location.InsolatorOutput)
+    return self:backward():turnRight():setLocation(Location.Insolator)
   else
     Log.error("Unrecognized location:", self.location)
     return nil, "Unrecognized location"
@@ -159,10 +123,10 @@ end
 function Maker:gotoSandStorage()
   if self.location == Location.Home then
     return self:forward():turnLeft():forward():setLocation(Location.SandStorage)
-  elseif self.location == Location.InsolatorOutput then
-    return self:turnLeft():forward():turnRight():forward(2):setLocation(Location.SandStorage)
-  elseif self.location == Location.InsolatorInput then
-    return self:turnRight():forward():turnRight():setLocation(Location.SandStorage)
+  elseif self.location == Location.Insolator then
+    return self:turnLeft():forwrad():setLocation(Location.Insolator)
+  elseif self.location == Location.SandStorage then
+    return self
   else
     Log.error("Unrecognized location:", self.location)
     return nil, "Unrecognized location"
@@ -235,7 +199,7 @@ function Maker:loop()
 
   while true do
     -- We need to get a Lily from the Insolator
-    ok, err = self:gotoInsolatorOutput()
+    ok, err = self:gotoInsolator()
     if not ok then
       error("Failed to move to Insolator: " .. err)
     end
@@ -245,19 +209,14 @@ function Maker:loop()
       error("Failed to get Insolator output: " .. err)
     end
 
+    -- Give one of the Lily of the Valley back to the Insolator for it to process
+    turtle.drop(1)
+
     -- Go home so we can interact with our storage
     ok, err = self:goHome()
     if not ok then
       error("Failed to go home: " .. err)
     end
-
-    -- Move one of the Lily of the Valley to our second slot then drop it into our storage.
-    turtle.transferTo(2, 1)
-    turtle.select(2)
-    turtle.turnLeft()
-    turtle.drop()
-    turtle.turnRight()
-    turtle.select(1)
 
     -- Turn the rest of Lily that we've received into dye
     ok, err = turtle.craft()
@@ -270,45 +229,6 @@ function Maker:loop()
     ok, err = self:checkSlot(1, "minecraft:white_dye")
     if not ok then
       error("Did not end up crafting white dye: " .. err)
-    end
-
-    -- Extract the Lily of the Valley from our storage into our second slot. Then store our white dye.
-    turtle.turnLeft()
-    turtle.select(2)
-    turtle.suck()
-    ok, err = self:checkSlot(2, "minecraft:lily_of_the_valley")
-    if not ok then
-      error("Failed to extract Lily of the Valley from storage")
-    end
-
-    turtle.select(1)
-    turtle.drop()
-    turtle.turnRight()
-
-    -- Now go to the Insolator input and deposit the Lily of the Valley
-    ok, err = self:gotoInsolatorInput()
-    if not ok then
-      error("Failed to go to Insolator input: " .. err)
-    end
-
-    -- Select the second slot (which contains our Lily of the Valley) and push it out to the Insolator
-    turtle.select(2)
-    turtle.drop()
-
-    -- Now go back home
-    ok, err = self:goHome()
-    if not ok then
-      error("Failed to go home: " .. err)
-    end
-
-    -- Turn to our storage and pull our the white dye into our first slot
-    turtle.turnLeft()
-    turtle.select(1)
-    turtle.suck()
-    turtle.turnRight()
-    ok, err = self:checkSlot(1, "minecraft:white_dye")
-    if not ok then
-      error("Failed to extract white dye from storage")
     end
 
     -- Go to the sand storage
