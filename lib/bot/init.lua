@@ -453,4 +453,46 @@ function Bot:pathFind(target, limit)
   return false, "unable to find path"
 end
 
+function Bot:groupInventory()
+  for target = 1, 16 do
+    local target_info = turtle.getItemDetail(target)
+    if target_info then
+      local target_remaining = turtle.getItemSpace(target)
+
+      for source = 1, 16 do
+        if source ~= target then
+          local source_info = turtle.getItemDetail(target)
+          if source_info and source_info.name == target_info.name then
+            local transfer = math.min(target_remaining, source_info.count)
+            if transfer > 0 then
+              turtle.select(source)
+              turtle.transferTo(target, transfer)
+              target_remaining = target_remaining - transfer
+            end
+          end
+        end
+
+        if target_remaining <= 0 then
+          break
+        end
+      end
+    end
+  end
+end
+
+function Bot:tidyInventory()
+  for target = 1, 16 do
+    local target_info = turtle.getItemDetail(target)
+    if not target_info then
+      for source = target + 1, 16 do
+        if turtle.getItemDetail(source) then
+          turtle.select(source)
+          turtle.transferTo(target)
+          break
+        end
+      end
+    end
+  end
+end
+
 return Bot
