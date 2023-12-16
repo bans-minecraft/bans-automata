@@ -1,3 +1,5 @@
+local M = {}
+
 -- A table of ores
 --
 -- This table lists the ores that I found in the creative block list. This should probably be
@@ -68,10 +70,26 @@ for _, name in ipairs(ORES_LIST) do
   ORES[name] = true
 end
 
-local M = {}
 
 M.isOre = function(info)
   return ORES[info.name] ~= nil
+end
+
+local FUELS_LIST = {
+  "minecraft:coal",
+  "minecraft:coal_block",
+  "minecraft:charcoal",
+  "mekanism:block_charcoal",
+  "quark:charcoal_block",
+}
+
+local FUELS = {}
+for _, name in ipairs(FUELS_LIST) do
+  FUELS[name] = true
+end
+
+M.isFuel = function(info)
+  return FUELS[info.name] ~= nil
 end
 
 return M
