@@ -42,7 +42,7 @@
 -- [2023-06-18] Simplify ores lookup to use table rather than list
 -- [2023-11-21] Add function to drop unwanted items
 -- [2023-11-23] Added more fuels
--- [2023-12-16] Added ability for bots to empty full inventory mid-mining
+-- [2023-12-16] Added ability for bots to empty full inventory mid-mining and inventory sorting
 
 package.path = "/?.lua;/?/init.lua;" .. package.path
 local AANode = require("lib.bot.aa.node")
@@ -326,6 +326,9 @@ function Miner:dropUnwanted()
 end
 
 function Miner:remainingInventory()
+  self.bot:groupInventory()
+  self.bot:sortInventory()
+
   local remaining = 16
   for slot = 1, 16 do
     local info = turtle.getItemDetail(slot)
