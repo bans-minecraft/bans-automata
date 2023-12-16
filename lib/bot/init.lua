@@ -14,7 +14,7 @@ local Bot = {}
 Bot.__index = Bot
 Bot.__name = "Bot"
 
-Bot.FUEL_SLOT = 16 -- Inventory slot in which fuel is stored (default: 16)
+Bot.FUEL_SLOT = 16  -- Inventory slot in which fuel is stored (default: 16)
 Bot.MIN_FUEL = 1000 -- Minimum fiel required for operation (default: 1000)
 
 function Bot:create(dir)
@@ -409,7 +409,7 @@ function Bot:move(steps)
       ok, err = self:face(step.direction)
       if not ok then
         return false,
-          ("Unable to turn to face direction %s in step %d: %s"):format(Direction.dirName(step.direction), index, err)
+            ("Unable to turn to face direction %s in step %d: %s"):format(Direction.dirName(step.direction), index, err)
       end
 
       if step.count > 0 then

@@ -173,8 +173,8 @@ function AA:buildPath(a, b, limit)
   end
 
   -- Make sure that the limit is sensible
-  if type(limit) ~= "number" or limit < 0 or limit > 500 then
-    limit = 500
+  if type(limit) ~= "number" or limit < 0 or limit > 9999999 then
+    limit = 9999999
   end
 
   -- The following tables (i.e. `openSet` and `visited`) are all indexed in the same as was the AA
@@ -182,11 +182,11 @@ function AA:buildPath(a, b, limit)
 
   local startIndex = AAUtils.positionKey(a)
   local goalIndex = AAUtils.positionKey(b)
-  local openSet = {} -- a table of vectors that have yet to be processed
+  local openSet = {}   -- a table of vectors that have yet to be processed
   local closedSet = {} -- a table of booleans indicating that we've processed a vector
-  local visited = {} -- a table of pairs of a direction and the index (a string key)
-  local gScore = {} -- a table of gScores for each vector
-  local fScore = {} -- a table of fScores for each vector
+  local visited = {}   -- a table of pairs of a direction and the index (a string key)
+  local gScore = {}    -- a table of gScores for each vector
+  local fScore = {}    -- a table of fScores for each vector
 
   -- Add the start node and its score to the open set
   openSet[startIndex] = a:clone()
@@ -195,7 +195,7 @@ function AA:buildPath(a, b, limit)
 
   while not Utils.isEmpty(openSet) do
     local fCurrent = 9999999
-    local current -- a Vector
+    local current      -- a Vector
     local currentIndex -- a string index
 
     -- Find the node with the lowest fScore in the open set.
