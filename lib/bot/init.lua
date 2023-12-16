@@ -480,7 +480,7 @@ function Bot:groupInventory()
   end
 end
 
-function Bot:tidyInventory()
+function Bot:sortInventory()
   for target = 1, 16 do
     local target_info = turtle.getItemDetail(target)
     if not target_info then
