@@ -54,13 +54,15 @@ local Vector = require("lib.vector")
 
 Log.setLogFile("bot-log.txt")
 
-local BRANCH_GAP = 3 -- Number of blocks between branches (default: 3)
-local MAX_BRANCHES = 200 -- Maximum number of branches (default: 200)
-local MAX_DEPTH = 200 -- Maximum branch depth (default: 200)
+local BRANCH_GAP    = 3    -- Number of blocks between branches (default: 3)
+local MAX_BRANCHES  = 500  -- Maximum number of branches (default: 500)
+local MAX_DEPTH     = 250  -- Maximum branch depth (default: 250)
+local MAX_PATH_FIND = 4000 -- Maximum number of steps in path-finding (default: 4000)
+local MIN_FUEL      = 4000 -- Minimum fuel for a bot (default: 4000)
 
-local Miner = {}
-Miner.__index = Miner
-Miner.__name = "Miner"
+local Miner         = {}
+Miner.__index       = Miner
+Miner.__name        = "Miner"
 
 function Miner:create(dir)
   local miner = {}
@@ -72,16 +74,6 @@ function Miner:create(dir)
 
   return miner
 end
-
-local FUELS = {
-  ["minecraft:charcoal"] = true,
-  ["mekanism:block_charcoal"] = true,
-  ["quark:charcoal_block"] = true,
-  ["thermal:charcoal_block"] = true,
-
-  ["minecraft:coal"] = true,
-  ["minecraft:coal_block"] = true,
-}
 
 function Miner:receiveFuel()
   -- Check to see if we need fuel
@@ -116,7 +108,7 @@ function Miner:receiveFuel()
     return false
   end
 
-  if not FUELS[info.name] then
+  if not Ores.isFuel(info) then
     Log.error("Unknown fuel " .. info.name .. " found in fuel slot (" .. self.bot.fuelSlot .. ")")
     turtle.select(1)
     return false
@@ -170,7 +162,7 @@ function Miner:homeProcesses()
   end
 
   local fuel_level = turtle.getFuelLevel()
-  if fuel_level < Bot.MIN_FUEL then
+  if fuel_level < MIN_FUEL then
     Log.info("Bot fuel level is low, attempting to refuel ...")
     if not self:receiveFuel() then
       return false
@@ -332,15 +324,27 @@ function Miner:dropUnwanted()
   end
 end
 
+function Miner:remainingInventory()
+  local remaining = 16
+  for slot = 1, 16 do
+    local info = turtle.getItemDetail(slot)
+    if info then
+      remaining = remaining - 1
+    end
+  end
+
+  return remaining
+end
+
 function Miner:excavationScan()
   local result = {}
 
   local queries = {
     { self.bot:queryForward(), self.bot.dir },
-    { self.bot:queryLeft(), self.bot:leftDirection() },
-    { self.bot:queryRight(), self.bot:rightDirection() },
-    { self.bot:queryUp(), Direction.Up },
-    { self.bot:queryDown(), Direction.Down },
+    { self.bot:queryLeft(),    self.bot:leftDirection() },
+    { self.bot:queryRight(),   self.bot:rightDirection() },
+    { self.bot:queryUp(),      Direction.Up },
+    { self.bot:queryDown(),    Direction.Down },
   }
 
   for _, query in ipairs(queries) do
@@ -371,7 +375,7 @@ function Miner:excavate()
     local target_block_node = self.bot.aa:query(Direction.offsetDirection(target_pos, target_dir))
     if target_block_node.state == AANode.FULL then
       -- Move the bot to the target bot position using the AA path finding.
-      local ok, err = self.bot:pathFind(target_pos, 200)
+      local ok, err = self.bot:pathFind(target_pos, MAX_PATH_FIND)
       if not ok then
         Log.error(("Failed to path find to ore at %s: %s"):format(target_pos, err))
         return false, err
@@ -482,7 +486,7 @@ function Miner:mineBranch(returning)
     if self.bot.pos:neq(start_pos) then
       -- Return to the original location before we started excavation
       Log.info("Returning to location before excavation")
-      ok, err = self.bot:pathFind(start_pos, 200)
+      ok, err = self.bot:pathFind(start_pos, MAX_PATH_FIND)
       if not ok then
         Log.error("Bot failed to return after excavating: " .. err)
         return false, "Failed to return from excavating"
@@ -500,6 +504,35 @@ function Miner:mineBranch(returning)
     end
 
     self:dropUnwanted()
+    if self:remainingInventory() < 2 then
+      Log.info(("Inventory is full, storing location %s and returning home"):format(self.bot.pos))
+
+      -- Store the location that we're at and the direction that we're facing
+      local return_pos, return_dir = self.bot.pos:clone(), self.bot.dir
+
+      -- Return to our home location
+      ok, err = self.bot:pathFind(Vector:create(0, 0, 0), MAX_PATH_FIND)
+      if not ok then
+        Log.error("Unable to return to home position: " .. err)
+        return false
+      end
+
+      -- Perform our home processes: dropping off items and refuelling.
+      if not self:homeProcesses() then
+        Log.error("Failed to perform home processes")
+        return false
+      end
+
+      -- Return to the previous location
+      ok, err = self.bot:pathFind(return_pos, MAX_PATH_FIND)
+      if not ok then
+        Log.error(("Failed to return to stored location %s: %s"):format(return_pos, err))
+        return false
+      end
+
+      -- turn to face the stored direction
+      self.bot:face(return_dir)
+    end
   end
 
   return true
@@ -510,9 +543,6 @@ function Miner:loop()
   local forward_dir = self.bot.dir
 
   while true do
-    -- Erase the bots AA so we start with a fresh view of the world
-    self.bot:clearAA()
-
     -- Perform our home processes
     if not self:homeProcesses() then
       Log.error("Failed to perform home processes (depositing blocks and refuelling)")
@@ -521,7 +551,7 @@ function Miner:loop()
 
     -- Make sure that we sufficient fuel to perform our mining
     local fuel_level = turtle.getFuelLevel()
-    if fuel_level < Bot.MIN_FUEL then
+    if fuel_level < MIN_FUEL then
       Log.error(("Fuel level %d is below minimum of %d"):format(fuel_level, Bot.MIN_FUEL))
       return
     else
@@ -541,7 +571,7 @@ function Miner:loop()
     ok, err = self:findBranch()
     if not ok then
       -- Turn the bot back around and proceed back to the home position
-      ok, err = self.bot:pathFind(Vector:create(0, 0, 0), 400)
+      ok, err = self.bot:pathFind(Vector:create(0, 0, 0), MAX_PATH_FIND)
       if not ok then
         Log.error("Unable to return to home position: " .. err)
         return
@@ -587,8 +617,9 @@ function Miner:loop()
       return
     end
 
-    -- We've succesfully mined the branch forwards and back. Return to the home position
-    ok, err = self.bot:pathFind(Vector:create(), 400)
+    -- We've either succesfully mined the branch forwards and back, or we've run out of inventory
+    -- and want to return to our home location.
+    ok, err = self.bot:pathFind(Vector:create(), MAX_PATH_FIND)
     if not ok then
       Log.error("Unable to return to home position: " .. err)
       return
