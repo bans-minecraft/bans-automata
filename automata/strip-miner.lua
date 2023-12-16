@@ -307,6 +307,7 @@ end
 
 local DROP = {
   ["minecraft:tuff"] = true,
+  ["minecraft:cobblestone"] = true,
   ["minecraft:deepslate"] = true,
   ["minecraft:cobbled_deepslate"] = true,
   ["minecraft:gravel"] = true,
