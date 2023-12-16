@@ -461,7 +461,7 @@ function Bot:groupInventory()
 
       for source = 1, 16 do
         if source ~= target then
-          local source_info = turtle.getItemDetail(target)
+          local source_info = turtle.getItemDetail(source)
           if source_info and source_info.name == target_info.name then
             local transfer = math.min(target_remaining, source_info.count)
             if transfer > 0 then
