@@ -549,7 +549,9 @@ function StoreBot:fetchInput()
     end
   end
 
-  Log.info(("Bot has received %d items from input"):format(received))
+  if received > 0 then
+    Log.info(("Bot has received %d items from input"):format(received))
+  end
 
   ok, err = self.bot:face(Direction.North)
   if not ok then
