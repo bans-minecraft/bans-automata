@@ -54,6 +54,7 @@
 -- [2023-11-14] Optimize (and simplify) initial area scanning
 -- [2023-11-14] Improve scanning of area by not turning to storage drawers
 -- [2023-11-15] Added the "update" command
+-- [2024-01-20] Now uses Utamacraft area awareness block to scan for drawers on 'update'
 
 package.path = "/?.lua;/?/init.lua;" .. package.path
 local AANode = require("lib.bot.aa.node")
@@ -321,6 +322,70 @@ end
 
 -----------------------------------------------------------------------------------------------
 
+function StoreBot:update()
+  -- Move to the awareness block, situated in the midst of our storage
+  self.bot:move(Direction.DirSeq:create():up(3):north(8):east(5):north(2):up(1):west(0))
+
+  -- Perform a scan using the awareness block. This will return to us a load of blocks.
+  local scanner = peripheral.wrap("front")
+  local scan, err = scanner.scan(8, "down")
+  if not scan then
+    Log.error(("Failed to perform scan: %s"):format(err))
+    return false, err
+  end
+
+  Log.info(("Scan returned %d blocks and cost %d energy"):format(#scan.blocks, scan.energy.cost))
+
+  -- Build a dictionary of our drawers, indexed by their coordinates
+  local drawers = {}
+  for _, drawer in ipairs(self.drawers) do
+    drawers[tostring(drawer.pos)] = drawer
+  end
+
+  local function relative(block)
+    block.x = block.x + 4
+    block.y = block.y + 4
+    block.z = block.z - 10
+  end
+
+  local updated = 0
+  for _, block in ipairs(scan.blocks) do
+    if block.name:match("storagedrawers:.*") then
+      -- Make the block's coordinates relative to our home position, as per the AA
+      relative(block)
+
+      -- Get the drawer at this coordinate
+      local pos = Vector:create(block.x, block.y, block.z)
+      local drawer = drawers[tostring(pos)]
+      if drawer then
+        drawer.size = block.inventory.size
+        drawer.slots = {}
+
+        for slot = 2, block.inventory.size do
+          local info = block.inventory.slots[slot]
+          if info.name ~= "minecraft:air" and info.count > 0 then
+            drawer.slots[slot] = info.name
+          end
+        end
+
+        updated = updated + 1
+      else
+        Log.error(("Failed to find drawer at %d:%d:%d"):format(block.x, block.y, block.z))
+      end
+    end
+  end
+
+  Log.info(("Updated %d drawers"):format(updated))
+
+  -- Move back to our home location
+  self.bot:move(Direction.DirSeq:create():down(1):south(2):west(5):south(8):down(3):north(0))
+
+  self:save()
+  return true
+end
+
+-----------------------------------------------------------------------------------------------
+
 function StoreBot:targetBlockInRange(block)
   return self.area:contains(block.x, block.y, block.z)
 end
@@ -330,10 +395,10 @@ function StoreBot:scanSurrounding()
 
   local queries = {
     { self.bot:queryForward(false), self.bot.dir },
-    { self.bot:queryLeft(false), self.bot:leftDirection() },
-    { self.bot:queryRight(false), self.bot:rightDirection() },
-    { self.bot:queryUp(), Direction.Up },
-    { self.bot:queryDown(), Direction.Down },
+    { self.bot:queryLeft(false),    self.bot:leftDirection() },
+    { self.bot:queryRight(false),   self.bot:rightDirection() },
+    { self.bot:queryUp(),           Direction.Up },
+    { self.bot:queryDown(),         Direction.Down },
   }
 
   for _, query in ipairs(queries) do
@@ -433,65 +498,6 @@ function StoreBot:scan()
       end
     end
   end
-
-  -- Return to the home location
-  ok, err = self.bot:pathFind(self.home, 200)
-  if not ok then
-    Log.error("Failed to path find back to start:", err)
-    return false, "Failed to return to start"
-  end
-
-  ok, err = self.bot:face(Direction.North)
-  if not ok then
-    Log.error("Failed to face north:", err)
-    return false, "Failed to face north"
-  end
-
-  self:save()
-  return true
-end
-
------------------------------------------------------------------------------------------------
-
-function StoreBot:update()
-  local ok, err
-  local ndrawers = 0
-  local nitems = 0
-
-  -- Clear out the items map
-  self.items = {}
-
-  -- Iterate over all our storage drawers
-  for _, drawer in ipairs(self.drawers) do
-    Log.info(("Checking storage drawer %s"):format(drawer.pos))
-
-    -- Pathfind to the storage drawer
-    ok, err = self.bot:pathFind(drawer:getBotCoord())
-    if not ok then
-      Log.error("Failed to pathfind to storage drawer:", err)
-      return false, "Failed to pathfind to storage drawer"
-    end
-
-    -- Turn the bot to face the drawer so we can interact with it.
-    ok, err = self.bot:face(drawer.dir)
-    if not ok then
-      Log.error("Failed to face storage drawer:", err)
-      return false, "Failed to face storage drawer"
-    end
-
-    -- Update the drawer
-    ok, err = drawer:update("front")
-    if not ok then
-      Log.error("Failed to update storage drawer contents:", err)
-      return false, "Failed to update storage drawer"
-    end
-
-    -- Add the items from the drawer into our memory
-    nitems = nitems + self:addLocationsForDrawer(drawer)
-    ndrawers = ndrawers + 1
-  end
-
-  Log.info(("Updated information on %d drawers with %d items"):format(ndrawers, nitems))
 
   -- Return to the home location
   ok, err = self.bot:pathFind(self.home, 200)
@@ -668,7 +674,7 @@ local function main(...)
   end
 
   if not ok then
-    error("Bot failed to complete task: " .. err)
+    error("Bot failed to complete task: " .. (err or "<no error>"))
   end
 end
 
