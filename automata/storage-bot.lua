@@ -177,6 +177,7 @@ function StoreBot:create()
   bot.home = bot.bot.pos:clone()
   bot.drawers = {}
   bot.items = {}
+  bot.digitized = {}
 
   return bot
 end
@@ -221,6 +222,7 @@ function StoreBot:load()
   bot.home = Vector:deserialize(data.home)
   bot.drawers = {}
   bot.items = {}
+  bot.digitized = {}
 
   local ndrawers = 0
   local nitems = 0
@@ -253,6 +255,33 @@ function StoreBot:addLocationsForDrawer(drawer)
   end
 
   return nitems
+end
+
+function StoreBot:selectNextFreeSlot(start)
+  local slot = start or 1
+  while slot <= 16 do
+    local info = turtle.getItemDetail(slot)
+    if info == nil then
+      turtle.select(slot)
+      return slot
+    end
+
+    slot = slot + 1
+  end
+
+  return 0
+end
+
+function StoreBot:remainingFreeSlots()
+  local remaining = 0
+  for slot = 1, 16 do
+    local info = turtle.getItemDetail(slot)
+    if not info then
+      remaining = remaining + 1
+    end
+  end
+
+  return remaining
 end
 
 -----------------------------------------------------------------------------------------------
@@ -381,6 +410,128 @@ function StoreBot:update()
   self.bot:move(Direction.DirSeq:create():down(1):south(2):west(5):south(8):down(3):north(0))
 
   self:save()
+  return true
+end
+
+-----------------------------------------------------------------------------------------------
+
+function StoreBot:getMaterializedItems(uuids)
+  -- Wrap the peripheral of the digitizer
+  local digitizer = peripheral.wrap("front")
+  if not digitizer then
+    return false, "Failed to wrap digitizer peripheral"
+  end
+
+  local slot = 1
+  while #uuids > 0 and slot <= 16 do
+    local uuid = uuids[1]
+
+    -- Find the next free inventory slot in the turtle.
+    slot = self:selectNextFreeSlot(slot)
+    if slot == 0 then
+      break
+    end
+
+    -- Simulate the materialization of the item stack associated with this UUID.
+    local sim, err = digitizer.materialize(uuid, nil, true)
+    if not sim then
+      Log.error(("Failed to simulate materialization of '%s': %s"):format(uuid, err))
+      return nil, "Failed to simulate item stack materialization"
+    end
+
+    -- Make sure that the digitizer has enough energy to perform the materialization
+    local delayed = 0
+    while delayed < 10 do
+      if digitizer.getEnergy() > sim.cost then
+        break
+      end
+
+      sleep(0.5)
+      delayed = delayed + 1
+    end
+
+    -- Make sure that the digitizer reached our required energy level
+    if delayed >= 10 and digitizer.getEnergy() < sim.cost then
+      Log.error(("Digitizer never reached required energy %d FE"):format(sim.cost))
+      return nil, "Digitizer never reached required energy to materialize item stack"
+    end
+
+    -- Perform the actual materialization
+    local result
+    result, err = digitizer.materialize(uuid)
+    if not result then
+      Log.error(("Failed to materialize '%s': %s"):format(uuid, err))
+      return nil, "Failed to materialize item stack"
+    end
+
+    Log.info(("Materialized %dx %s"):format(result.materialized, result.item.name))
+
+    -- Try and take the items from the digitizer
+    result, err = turtle.suck(result.materialized)
+    if not result then
+      Log.error("")
+    end
+
+    -- Pop the UUID from the list of UUIDs
+    table.remove(uuids, 1)
+  end
+
+  return true
+end
+
+function StoreBot:handleMaterialized(uuids)
+  -- Move the bot to the digitizer block
+  self.bot:move(Direction.DirSeq:create():up(1):east(1))
+
+  -- Record this location as the location of the digitizer
+  local digitizerLoc = self.bot.pos:clone()
+
+  local ok, err
+  while #uuids > 0 do
+    -- Try and get an inventory full of items from the digitizer.
+    ok, err = self:getMaterializedItems(uuids)
+    if not ok then
+      -- We couldn't retrieve anything
+      Log.error(("Failed to retrieve %d digitized items: %s"):format(#uuids, err))
+      for _, uuid in ipairs(uuids) do
+        Log.info(("Remaining UUID: %s"):format(uuid))
+      end
+
+      return false, "Failed to materialize items"
+    end
+
+    -- Go through all our inventory and place the items
+    self:putAway()
+
+    -- Path find back to the digitizer if we have any more UUIDs
+    if #uuids > 0 then
+      ok, err = self.bot:pathFind(digitizerLoc, 200)
+      if not ok then
+        Log.error("Failed to path find back to digitizer:", err)
+        return false, "Failed to return to digitizer"
+      end
+
+      ok, err = self.bot:face(Direction.East)
+      if not ok then
+        Log.error("Failed to face east:", err)
+        return false, "Failed to face east"
+      end
+    end
+  end
+
+  -- Return to the home location
+  ok, err = self.bot:pathFind(self.home, 200)
+  if not ok then
+    Log.error("Failed to path find back to start:", err)
+    return false, "Failed to return to start"
+  end
+
+  ok, err = self.bot:face(Direction.North)
+  if not ok then
+    Log.error("Failed to face north:", err)
+    return false, "Failed to face north"
+  end
+
   return true
 end
 
@@ -568,30 +719,7 @@ function StoreBot:fetchInput()
   return received
 end
 
-function StoreBot:loop()
-  local count, ok, err
-
-  -- Make sure that we have enough fuel
-  ok, err = self:refuelIfNeeded()
-  if not ok then
-    Log.error("Encountered error refueling:", err)
-    return false, "Failed to refuel bot"
-  end
-
-  -- Turn to our input chest and see what's going on
-  count, err = self:fetchInput()
-  if count == nil then
-    Log.error("Failed to fetch input:", err)
-    return false, "Failed to fetch input"
-  end
-
-  -- If we didn't receive anything, wait for a bit and then try again
-  if count == 0 then
-    sleep(60)
-    return true
-  end
-
-  -- Go through all our inventory and place the items
+function StoreBot:putAway()
   for slot = 1, 16 do
     local info = turtle.getItemDetail(slot)
     if info then
@@ -601,7 +729,7 @@ function StoreBot:loop()
         Log.info(("Storing %dx %s in drawer %s"):format(info.count, info.name, drawer.pos))
 
         -- Move the bot over to the block infront of the drawer
-        ok, err = self.bot:pathFind(drawer:getBotCoord())
+        local ok, err = self.bot:pathFind(drawer:getBotCoord())
         if not ok then
           Log.error("Failed to pathfind to storage drawer:", err)
           return false, "Failed to pathfind to storage drawer"
@@ -622,31 +750,105 @@ function StoreBot:loop()
       end
     end
   end
+end
+
+function StoreBot:handleInput()
+  local count, ok, err
+
+  -- Turn to our input chest and see what's going on
+  count, err = self:fetchInput()
+  if count == nil then
+    Log.error("Failed to fetch input:", err)
+    return -1, "Failed to fetch input"
+  end
+
+  -- If we didn't receive anything, wait for a bit and then try again
+  if count == 0 then
+    return 0
+  end
+
+  -- Go through all our inventory and place the items
+  self:putAway()
 
   -- Return to the home location
   ok, err = self.bot:pathFind(self.home, 200)
   if not ok then
     Log.error("Failed to path find back to start:", err)
-    return false, "Failed to return to start"
+    return -1, "Failed to return to start"
   end
 
   ok, err = self.bot:face(Direction.North)
   if not ok then
     Log.error("Failed to face north:", err)
-    return false, "Failed to face north"
+    return -1, "Failed to face north"
   end
 
-  return true
+  return count
+end
+
+function StoreBot:receiveRednet()
+  while true do
+    local sender, message = rednet.receive("bannet:storagebot.digitizer")
+    if sender and message then
+      Log.info(("Received %d digitized items"):format(#message))
+      Utils.concat(self.digitized, message)
+    end
+  end
+end
+
+function StoreBot:loop()
+  local ok, err
+  while true do
+    -- Make sure that we have enough fuel
+    ok, err = self:refuelIfNeeded()
+    if not ok then
+      Log.error("Encountered error refueling:", err)
+      return false, "Failed to refuel bot"
+    end
+
+    -- See if we have any rednet items to process
+    if #self.digitized > 0 then
+      -- Take the digitized items from the bot
+      local digitized = self.digitized
+      self.digitized = {}
+
+      -- Rematerialize and then file the items
+      ok, err = self:handleMaterialized(digitized)
+      if not ok then
+        Log.error(("Failed to handle digitized items: %s"):format(err))
+        return false
+      end
+
+      -- If we have any remaining UUIDs, put them back into the bot
+      Utils.concat(self.digitized, digitized)
+    end
+
+    -- See if we have anything to handle in our input
+    ok, err = self:handleInput()
+    if ok == -1 then
+      Log.error(("Failed to handle input: %s"):format(err))
+      return false
+    end
+
+    -- Wait for a bit if we didn't process anything
+    if ok == 0 then
+      sleep(10)
+    end
+  end
 end
 
 function StoreBot:run()
-  while true do
-    local ok, err = self:loop()
-    if not ok then
-      Log.error("Main bot loop failed:", err)
-      return false, "Main bot loop failed"
-    end
+  rednet.open("right")
+
+  local function receive()
+    self:receiveRednet()
   end
+
+  local function loop()
+    self:loop()
+  end
+
+  parallel.waitForAny(receive, loop)
 end
 
 local function main(...)
