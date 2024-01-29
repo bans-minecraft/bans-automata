@@ -441,12 +441,12 @@ function StoreBot:getMaterializedItems(uuids)
 
     -- Make sure that the digitizer has enough energy to perform the materialization
     local delayed = 0
-    while delayed < 10 do
+    while delayed < 15 do
       if digitizer.getEnergy() > sim.cost then
         break
       end
 
-      sleep(0.5)
+      sleep(1)
       delayed = delayed + 1
     end
 
