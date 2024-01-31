@@ -33,12 +33,12 @@ end
 -- This table provides a LUT from a `Direction` to a unit `Vector` in the given direction. See
 -- the `dirOffset()` function.
 local DIR_OFFSET = {}
-DIR_OFFSET[M.North] = Vector:create(0, 0, -1)
-DIR_OFFSET[M.South] = Vector:create(0, 0, 1)
-DIR_OFFSET[M.East] = Vector:create(1, 0, 0)
-DIR_OFFSET[M.West] = Vector:create(-1, 0, 0)
-DIR_OFFSET[M.Up] = Vector:create(0, 1, 0)
-DIR_OFFSET[M.Down] = Vector:create(0, -1, 0)
+DIR_OFFSET[M.North] = Vector:new(0, 0, -1)
+DIR_OFFSET[M.South] = Vector:new(0, 0, 1)
+DIR_OFFSET[M.East] = Vector:new(1, 0, 0)
+DIR_OFFSET[M.West] = Vector:new(-1, 0, 0)
+DIR_OFFSET[M.Up] = Vector:new(0, 1, 0)
+DIR_OFFSET[M.Down] = Vector:new(0, -1, 0)
 
 -- Get the offset for a direction
 --
@@ -185,4 +185,3 @@ M.seq = function()
 end
 
 return M
-

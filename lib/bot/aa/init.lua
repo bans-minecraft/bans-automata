@@ -48,7 +48,7 @@ function AA.static.deserialize(data)
 
   local aa = AA:new()
   for key, value in pairs(data.cache) do
-    aa.cache[key] = AANode:deserialize(value)
+    aa.cache[key] = AANode.deserialize(value)
   end
 
   return aa
@@ -210,17 +210,6 @@ end
 -- nodes in the `visited` table. This returns a table of directions, where each direction indicates
 -- that the bot should take a step in that direction (e.g. `North, North, East, East`).
 local function reconstructPath(visited, goal)
-  local path = {}
-
-  while visited[goal] ~= nil do
-    table.insert(path, 1, visited[goal][1])
-    goal = visited[goal][2]
-  end
-
-  return path
-end
-
-M.reconstructPath = function(visited, goal)
   local path = {}
 
   while visited[goal] ~= nil do
@@ -403,4 +392,3 @@ function AA:buildPathOld(a, b, limit)
 end
 
 return AA
-

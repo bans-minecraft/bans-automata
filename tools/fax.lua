@@ -201,7 +201,7 @@ function FaxSender:digitize(slot, count)
       return false
     end
 
-    self.inventory.pushItems(peripheral.getName(self.digitizer), slot, count, 1)
+    self.digitizer.pullItems(peripheral.getName(self.inventory), slot, count, 1)
   end
 
   -- Run a simulation of the digitization so we know how much it'll cost.
@@ -238,12 +238,6 @@ function FaxSender:digitizeInventory()
 
   for slot = 1, slots do
     local info = self.inventory.getItemDetail(slot)
-
-    -- TODO: Handle a bastard bug in the digitizer
-    if self.inventory == self.digitizer and info then
-      info = info[1]
-    end
-
     if info and info.count > 0 then
       Log.info(("Digitizing %dx %s in slot %d"):format(info.count, info.name, slot))
       if not self:digitize(slot, info.count) then
@@ -391,7 +385,7 @@ function FaxReceiver:materializeStack(uuid)
 end
 
 function FaxReceiver:moveToInventory()
-  self.inventory.pullItems(peripheral.getName(self.digitizer), 1)
+  self.digitizer.pushItems(peripheral.getName(self.inventory), 1)
 end
 
 function FaxReceiver:materializeStacks(uuids)
@@ -410,12 +404,6 @@ function FaxReceiver:materializeStacks(uuids)
     end
   else
     local info = self.digitizer.getItemDetail(1)
-
-    -- TODO: fucking digitizer interface
-    if info then
-      info = info[1]
-    end
-
     if info and info.count > 0 then
       Log.warn(("Digitizer contains %dx %s; moving to inventory before materializing"):format(info.count, info.name))
       self:moveToInventory()
@@ -462,6 +450,7 @@ end
 function FaxReceiver:cli()
   Log.info(("Fax running in receive mode with address: %s"):format(self.address))
   Log.info("Press 'q' to quit")
+  self:moveToInventory()
 
   repeat
     local _, key = os.pullEvent("key")

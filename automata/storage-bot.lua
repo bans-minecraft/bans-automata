@@ -57,58 +57,50 @@
 -- [2024-01-20] Now uses Utamacraft area awareness block to scan for drawers on 'update'
 
 package.path = "/?.lua;/?/init.lua;" .. package.path
+local Assert = require("lib.assert")
+local AABB = require("lib.aabb")
 local AANode = require("lib.bot.aa.node")
 local AAUtils = require("lib.bot.aa.utils")
-local AABB = require("lib.aabb")
 local Bot = require("lib.bot")
 local Log = require("lib.log")
 local Direction = require("lib.direction")
 local Utils = require("lib.utils")
 local Vector = require("lib.vector")
+local class = require("lib.class")
 
 Log.setLogFile("storage-bot.log", true)
 
 -----------------------------------------------------------------------------------------------
 
-local Drawer = {}
-Drawer.__index = Drawer
-Drawer.__name = "Drawer"
+local Drawer = class("Drawer")
 
-function Drawer:create(index, pos, dir, side)
-  Log.assertIs(index, "number")
-  Log.assertClass(pos, Vector)
+function Drawer:init(index, pos, dir, side)
+  Assert.assertIs(index, "number")
+  Assert.assertInstance(pos, Vector)
   Direction.assertDir(dir)
 
-  local drawer = {}
-  setmetatable(drawer, Drawer)
+  self.index = index
+  self.pos = pos
+  self.dir = dir
+  self.size = 0
+  self.slots = {}
 
-  drawer.index = index
-  drawer.pos = pos
-  drawer.dir = dir
-  drawer.size = 0
-  drawer.slots = {}
-
-  local ok, err = drawer:update(side)
-  if not ok then
-    return nil, err
+  if side ~= nil then
+    local ok, err = self:update(side)
+    if not ok then
+      return nil, err
+    end
   end
-
-  return drawer
 end
 
-function Drawer:deserialize(data)
-  Log.assertIs(data, "table")
-  Log.assertIs(data.index, "number")
-  Log.assertIs(data.dir, "number")
-  Log.assertIs(data.size, "number")
-  Log.assertIs(data.slots, "table")
+function Drawer.static.deserialize(data)
+  Assert.assertIs(data, "table")
+  Assert.assertIs(data.index, "number")
+  Assert.assertIs(data.dir, "number")
+  Assert.assertIs(data.size, "number")
+  Assert.assertIs(data.slots, "table")
 
-  local drawer = {}
-  setmetatable(drawer, Drawer)
-
-  drawer.index = data.index
-  drawer.pos = Vector:deserialize(data.pos)
-  drawer.dir = data.dir
+  local drawer = Drawer:new(data.index, Vector.deserialize(data.pos), data.dir)
   drawer.size = data.size
   drawer.slots = data.slots
 
@@ -154,7 +146,7 @@ end
 -----------------------------------------------------------------------------------------------
 
 local function createArea()
-  local area = AABB:create()
+  local area = AABB:new()
   area:addPoint(-4, 1, -19)
   area:addPoint(11, 3, -1)
   return area
@@ -162,24 +154,17 @@ end
 
 -----------------------------------------------------------------------------------------------
 
-local StoreBot = {}
-StoreBot.__index = StoreBot
-StoreBot.__name = "StoreBot"
+local StoreBot = class("StoreBot")
 
-StoreBot.MIN_FUEL = 2000
+StoreBot.static.MIN_FUEL = 2000
 
-function StoreBot:create()
-  local bot = {}
-  setmetatable(bot, StoreBot)
-
-  bot.area = createArea()
-  bot.bot = Bot:create(Direction.North)
-  bot.home = bot.bot.pos:clone()
-  bot.drawers = {}
-  bot.items = {}
-  bot.digitized = {}
-
-  return bot
+function StoreBot:init()
+  self.area = createArea()
+  self.bot = Bot:new(Direction.North)
+  self.home = self.bot.pos:clone()
+  self.drawers = {}
+  self.items = {}
+  self.digitized = {}
 end
 
 -----------------------------------------------------------------------------------------------
@@ -212,23 +197,19 @@ function StoreBot:load()
     return nil, "Failed to read storage bot data"
   end
 
-  Log.assertIs(data, "table")
+  Assert.assertIs(data, "table")
 
-  local bot = {}
-  setmetatable(bot, StoreBot)
+  local bot = StoreBot:new()
 
   bot.area = createArea()
-  bot.bot = Bot:deserialize(data.bot)
-  bot.home = Vector:deserialize(data.home)
-  bot.drawers = {}
-  bot.items = {}
-  bot.digitized = {}
+  bot.bot = Bot.deserialize(data.bot)
+  bot.home = Vector.deserialize(data.home)
 
   local ndrawers = 0
   local nitems = 0
 
   for index, drawer_spec in ipairs(data.drawers) do
-    local drawer = Drawer:deserialize(drawer_spec)
+    local drawer = Drawer.deserialize(drawer_spec)
     for _, item in pairs(drawer.slots) do
       if item then
         bot.items[item] = index
@@ -245,7 +226,7 @@ function StoreBot:load()
 end
 
 function StoreBot:addLocationsForDrawer(drawer)
-  Log.assertClass(drawer, Drawer)
+  Assert.assertInstance(drawer, Drawer)
   local nitems = 0
   for _, item in pairs(drawer.slots) do
     if item then
@@ -353,7 +334,7 @@ end
 
 function StoreBot:update()
   -- Move to the awareness block, situated in the midst of our storage
-  self.bot:move(Direction.DirSeq:create():up(3):north(8):east(5):north(2):up(1):west(0))
+  self.bot:move(Direction.DirSeq:new():up(3):north(8):east(5):north(2):up(1):west(0))
 
   -- Perform a scan using the awareness block. This will return to us a load of blocks.
   local scanner = peripheral.wrap("front")
@@ -384,7 +365,7 @@ function StoreBot:update()
       relative(block)
 
       -- Get the drawer at this coordinate
-      local pos = Vector:create(block.x, block.y, block.z)
+      local pos = Vector:new(block.x, block.y, block.z)
       local drawer = drawers[tostring(pos)]
       if drawer then
         drawer.size = block.inventory.size
@@ -407,131 +388,9 @@ function StoreBot:update()
   Log.info(("Updated %d drawers"):format(updated))
 
   -- Move back to our home location
-  self.bot:move(Direction.DirSeq:create():down(1):south(2):west(5):south(8):down(3):north(0))
+  self.bot:move(Direction.DirSeq:new():down(1):south(2):west(5):south(8):down(3):north(0))
 
   self:save()
-  return true
-end
-
------------------------------------------------------------------------------------------------
-
-function StoreBot:getMaterializedItems(uuids)
-  -- Wrap the peripheral of the digitizer
-  local digitizer = peripheral.wrap("front")
-  if not digitizer then
-    return false, "Failed to wrap digitizer peripheral"
-  end
-
-  local slot = 1
-  while #uuids > 0 and slot <= 16 do
-    local uuid = uuids[1]
-
-    -- Find the next free inventory slot in the turtle.
-    slot = self:selectNextFreeSlot(slot)
-    if slot == 0 then
-      break
-    end
-
-    -- Simulate the materialization of the item stack associated with this UUID.
-    local sim, err = digitizer.materialize(uuid, nil, true)
-    if not sim then
-      Log.error(("Failed to simulate materialization of '%s': %s"):format(uuid, err))
-      return nil, "Failed to simulate item stack materialization"
-    end
-
-    -- Make sure that the digitizer has enough energy to perform the materialization
-    local delayed = 0
-    while delayed < 15 do
-      if digitizer.getEnergy() > sim.cost then
-        break
-      end
-
-      sleep(1)
-      delayed = delayed + 1
-    end
-
-    -- Make sure that the digitizer reached our required energy level
-    if delayed >= 10 and digitizer.getEnergy() < sim.cost then
-      Log.error(("Digitizer never reached required energy %d FE"):format(sim.cost))
-      return nil, "Digitizer never reached required energy to materialize item stack"
-    end
-
-    -- Perform the actual materialization
-    local result
-    result, err = digitizer.materialize(uuid)
-    if not result then
-      Log.error(("Failed to materialize '%s': %s"):format(uuid, err))
-      return nil, "Failed to materialize item stack"
-    end
-
-    Log.info(("Materialized %dx %s"):format(result.materialized, result.item.name))
-
-    -- Try and take the items from the digitizer
-    result, err = turtle.suck(result.materialized)
-    if not result then
-      Log.error(("Failed to retrieve items from digitizer: %s"):format(err))
-    end
-
-    -- Pop the UUID from the list of UUIDs
-    table.remove(uuids, 1)
-  end
-
-  return true
-end
-
-function StoreBot:handleMaterialized(uuids)
-  -- Move the bot to the digitizer block
-  self.bot:move(Direction.DirSeq:create():up(1):east(1))
-
-  -- Record this location as the location of the digitizer
-  local digitizerLoc = self.bot.pos:clone()
-
-  local ok, err
-  while #uuids > 0 do
-    -- Try and get an inventory full of items from the digitizer.
-    ok, err = self:getMaterializedItems(uuids)
-    if not ok then
-      -- We couldn't retrieve anything
-      Log.error(("Failed to retrieve %d digitized items: %s"):format(#uuids, err))
-      for _, uuid in ipairs(uuids) do
-        Log.info(("Remaining UUID: %s"):format(uuid))
-      end
-
-      return false, "Failed to materialize items"
-    end
-
-    -- Go through all our inventory and place the items
-    self:putAway()
-
-    -- Path find back to the digitizer if we have any more UUIDs
-    if #uuids > 0 then
-      ok, err = self.bot:pathFind(digitizerLoc, 200)
-      if not ok then
-        Log.error("Failed to path find back to digitizer:", err)
-        return false, "Failed to return to digitizer"
-      end
-
-      ok, err = self.bot:face(Direction.East)
-      if not ok then
-        Log.error("Failed to face east:", err)
-        return false, "Failed to face east"
-      end
-    end
-  end
-
-  -- Return to the home location
-  ok, err = self.bot:pathFind(self.home, 200)
-  if not ok then
-    Log.error("Failed to path find back to start:", err)
-    return false, "Failed to return to start"
-  end
-
-  ok, err = self.bot:face(Direction.North)
-  if not ok then
-    Log.error("Failed to face north:", err)
-    return false, "Failed to face north"
-  end
-
   return true
 end
 
@@ -619,7 +478,7 @@ function StoreBot:scan()
         if found[drawer_key] == nil then
           -- Create the new drawer and add it to the set of drawers
           local side = Direction.directionSide(self.bot.dir, direction)
-          local drawer = Drawer:create(#self.drawers + 1, drawer_pos, direction, side)
+          local drawer = Drawer:new(#self.drawers + 1, drawer_pos, direction, side)
           table.insert(self.drawers, drawer)
 
           -- Add the items from the drawer into our memory
@@ -786,17 +645,7 @@ function StoreBot:handleInput()
   return count
 end
 
-function StoreBot:receiveRednet()
-  while true do
-    local sender, message = rednet.receive("bannet:storagebot.digitizer")
-    if sender and message then
-      Log.info(("Received %d digitized items"):format(#message))
-      Utils.concat(self.digitized, message)
-    end
-  end
-end
-
-function StoreBot:loop()
+function StoreBot:run()
   local ok, err
   while true do
     -- Make sure that we have enough fuel
@@ -837,20 +686,6 @@ function StoreBot:loop()
   end
 end
 
-function StoreBot:run()
-  rednet.open("right")
-
-  local function receive()
-    self:receiveRednet()
-  end
-
-  local function loop()
-    self:loop()
-  end
-
-  parallel.waitForAny(receive, loop)
-end
-
 local function main(...)
   local args = { ... }
   local ok, err
@@ -863,7 +698,7 @@ local function main(...)
       local bot = StoreBot:load()
       ok, err = bot:run()
     elseif args[1] == "scan" then
-      local bot = StoreBot:create()
+      local bot = StoreBot:new()
       ok, err = bot:scan()
     elseif args[1] == "update" then
       local bot = StoreBot:load()

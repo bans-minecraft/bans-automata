@@ -12,8 +12,8 @@ local M = {}
 -- See: https://en.wikipedia.org/wiki/Taxicab_geometry
 --
 M.costEstimate = function(a, b)
-  Assert.assertClass(a, Vector)
-  Assert.assertClass(b, Vector)
+  Assert.assertInstance(a, Vector)
+  Assert.assertInstance(b, Vector)
   return math.abs(b.x - a.x) + math.abs(b.y - a.y) + math.abs(b.z - a.z)
 end
 
@@ -38,4 +38,3 @@ M.reconstructPath = function(visited, goal)
 end
 
 return M
-

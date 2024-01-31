@@ -25,12 +25,12 @@ function Bot:init(dir)
   -- of the bot's process (often referred to as the "home" position). The direction should be the
   -- global (world) direction, as seen in the F3 debug overlay. if no direction is given in the
   -- `dir` argument to this constructor, we default to North.
-  self.pos = Vector:create()
-  self.start = Vector:create()
+  self.pos = Vector:new()
+  self.start = Vector:new()
   self.dir = dir or Direction.North
 
   -- Create the Area Awareness system
-  self.aa = AA:create()
+  self.aa = AA:new()
 
   -- When the bot is created, perform a scan around our immediate environment to initialize the AA.
   self:cacheAround()
