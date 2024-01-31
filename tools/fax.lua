@@ -417,8 +417,18 @@ function FaxReceiver:materializeStacks(uuids)
   end
 end
 
+function FaxReceiver:sendAck(packet)
+  Log.info(("Sending acknowledgement of fax '%s' to '%s'"):format(packet.id, packet.src))
+  local ok, err = self:send(packet:createAck())
+  if not ok then
+    Log.error(("Failed to send packet: %s"):format(err))
+  end
+end
+
 function FaxReceiver:handleFax(packet)
   Log.info(("Received fax from '%s': %s"):format(packet.src, packet.subject))
+  self:sendAck(packet)
+
   for index, content in ipairs(packet.content) do
     if content.type == "digitized" then
       local uuids = content.uuids or {}
@@ -430,12 +440,6 @@ function FaxReceiver:handleFax(packet)
     else
       Log.warn(("Ignoring unrecognized fax content '%s' at %d"):format(content.type, index))
     end
-  end
-
-  Log.info(("Sending acknowledgement of fax '%s' to '%s'"):format(packet.id, packet.src))
-  local ok, err = self:send(packet:createAck())
-  if not ok then
-    Log.error(("Failed to send packet: %s"):format(err))
   end
 end
 
