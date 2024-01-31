@@ -1,3 +1,4 @@
+package.path = "/?.lua;/?/init.lua;" .. package.path
 local Assert = require("lib.assert")
 local Log = require("lib.log")
 local Utils = require("lib.utils")
@@ -35,13 +36,25 @@ function Fax:setupModem()
     return false
   end
 
-  self.modem = modems[1]
+  self.modem = nil
+  for _, modem in ipairs(modems) do
+    if modem.isWireless() then
+      self.modem = modem
+    end
+  end
+
+  if not self.modem then
+    self.modem = modems[1]
+  end
+
   self.opened = false
-  if not rednet.isOpen(self.modem) then
-    Log.info(("Opening rednet on modem '%s'"):format(peripheral.getName(self.modem)))
-    rednet.open(self.modem)
+  local name = peripheral.getName(self.modem)
+  if not rednet.isOpen(name) then
+    Log.info(("Opening rednet on modem '%s'"):format(name))
+    rednet.open(name)
+    self.opened = true
   else
-    Log.info(("Rednet already open on modem '%s'"):format(peripheral.getName(self.modem)))
+    Log.info(("Rednet already open on modem '%s'"):format(name))
   end
 
   return true
@@ -53,8 +66,9 @@ end
 
 function Fax:shutdownModem()
   if self.modem and self.opened then
-    Log.info(("Closing rednet on modem '%s'"):format(peripheral.getName(self.modem)))
-    rednet.close(self.modem)
+    local name = peripheral.getName(self.modem)
+    Log.info(("Closing rednet on modem '%s'"):format(name))
+    rednet.close(name)
   end
 
   self.modem = nil
@@ -123,6 +137,8 @@ function Fax:findInventory()
     self.inventory = self.digitizer
     Log.info(("Using digitizer inventory with %d slot(s)"):format(self.inventory.size()))
   end
+
+  return true
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -166,7 +182,7 @@ function FaxSender.static.parseOptions(args)
 end
 
 function FaxSender.static.validateOptions(options)
-  if options.receipient == nil then
+  if options.recipient == nil then
     Log.error("Expected recipient with 'to <recipient>' argument")
     return false
   end
@@ -211,7 +227,7 @@ function FaxSender:digitize(slot, count)
 
   self.stats.stacks = self.stats.stacks + 1
   self.stats.items = self.stats.items + result.item.count
-  self.stats.cost = self.stats.cost + result.item.cost
+  self.stats.cost = self.stats.cost + result.cost
   table.insert(self.digitized, result.item)
   return true
 end
@@ -220,7 +236,14 @@ function FaxSender:digitizeInventory()
   local slots = self.inventory.size()
   Log.info(("Digitizing inventory with %d slot(s)"):format(slots))
 
-  for slot, info in pairs(self.inventory.list()) do
+  for slot = 1, slots do
+    local info = self.inventory.getItemDetail(slot)
+
+    -- TODO: Handle a bastard bug in the digitizer
+    if self.inventory == self.digitizer and info then
+      info = info[1]
+    end
+
     if info and info.count > 0 then
       Log.info(("Digitizing %dx %s in slot %d"):format(info.count, info.name, slot))
       if not self:digitize(slot, info.count) then
@@ -274,7 +297,7 @@ function FaxSender:sendDigitizedItems()
   }
 
   for _, item in ipairs(self.digitized) do
-    table.insert(content.uuids, item.id)
+    table.insert(content[1].uuids, item.id)
   end
 
   local subject = ("Fax of %d item stack(s)"):format(#self.digitized)
@@ -371,10 +394,10 @@ function FaxReceiver:moveToInventory()
   self.inventory.pullItems(peripheral.getName(self.digitizer), 1)
 end
 
-function FaxReceiver:materalizeStacks(uuids)
+function FaxReceiver:materializeStacks(uuids)
   Log.info(("Materializing %d stack(s) of items"):format(#uuids))
   if self.inventory == self.digitizer then
-    if #uuids > 0 then
+    if #uuids > 1 then
       Log.warn(("Unable to digitize %d items without separate inventory"):format(#uuids))
     end
 
@@ -387,6 +410,12 @@ function FaxReceiver:materalizeStacks(uuids)
     end
   else
     local info = self.digitizer.getItemDetail(1)
+
+    -- TODO: fucking digitizer interface
+    if info then
+      info = info[1]
+    end
+
     if info and info.count > 0 then
       Log.warn(("Digitizer contains %dx %s; moving to inventory before materializing"):format(info.count, info.name))
       self:moveToInventory()
@@ -404,7 +433,7 @@ function FaxReceiver:handleFax(packet)
   Log.info(("Received fax from '%s': %s"):format(packet.src, packet.subject))
   for index, content in ipairs(packet.content) do
     if content.type == "digitized" then
-      local uuids = content.digitized or {}
+      local uuids = content.uuids or {}
       if #uuids > 0 then
         self:materializeStacks(uuids)
       else
@@ -413,6 +442,12 @@ function FaxReceiver:handleFax(packet)
     else
       Log.warn(("Ignoring unrecognized fax content '%s' at %d"):format(content.type, index))
     end
+  end
+
+  Log.info(("Sending acknowledgement of fax '%s' to '%s'"):format(packet.id, packet.src))
+  local ok, err = self:send(packet:createAck())
+  if not ok then
+    Log.error(("Failed to send packet: %s"):format(err))
   end
 end
 
@@ -425,7 +460,9 @@ function FaxReceiver:handlePacket(packet)
 end
 
 function FaxReceiver:cli()
-  Log.info("Fax running in receive mode; press 'q' to quit")
+  Log.info(("Fax running in receive mode with address: %s"):format(self.address))
+  Log.info("Press 'q' to quit")
+
   repeat
     local _, key = os.pullEvent("key")
   until key == keys.q
@@ -502,7 +539,6 @@ local function parseOptions(args)
     error(("Uknnown mode '%s'; expected 'help', 'send' or 'receive'"):format(args[1]))
   end
 
-  args = pairOptions(args)
   local fax
   if mode == "send" then
     local options = FaxSender.parseOptions(pairOptions(args))
@@ -529,7 +565,7 @@ local function main(args)
     return
   end
 
-  parallel.waitForAny(fax.run, fax.cli)
+  parallel.waitForAny(function() fax:run() end, function() fax:cli() end)
 end
 
 main({ ... })

@@ -24,9 +24,9 @@ function FaxSendPacket:init(srcName, destName, id, subject, replay, content)
 end
 
 function FaxSendPacket.static.parse(message)
-  if message.type ~= "fax" then
-    Log.error(("Invalid packet type for FaxSendPacket; expected 'fax' found '%s'"):format(message.type))
-    return nil, "invalid packet type"
+  if message.type ~= "send" then
+    Log.error(("Invalid packet type for FaxSendPacket; expected 'send' found '%s'"):format(message.type))
+    error("Invalid packet type")
   end
 
   local payload = message.payload
@@ -36,7 +36,7 @@ function FaxSendPacket.static.parse(message)
   Assert.assertIs(payload.content, "table")
 
   if payload.replay ~= nil then
-    Assert.assertis(payload.replay, "string")
+    Assert.assertIs(payload.replay, "string")
   end
 
   return FaxSendPacket:new(message.src, message.dest, payload.id, payload.subject, payload.replay, payload.content)
@@ -49,6 +49,11 @@ function FaxSendPacket:renderPayload()
     replay = self.replay,
     content = Utils.clone(self.content)
   }
+end
+
+function FaxSendPacket:createAck()
+  local FaxAckPacket = require("lib.protocols.bannet.fax.packet.ack")
+  return FaxAckPacket:new(self.dest, self.src, self.id)
 end
 
 return FaxSendPacket

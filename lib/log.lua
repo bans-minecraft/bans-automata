@@ -1,4 +1,4 @@
-local pretty = pcall(require, "cc.pretty")
+local _, pretty = pcall(require, "cc.pretty")
 local prettyPrint
 if pretty then
   prettyPrint = function(value, width)
@@ -95,4 +95,3 @@ M.trap = function(func, ...)
 end
 
 return M
-

@@ -33,7 +33,7 @@ function Packet.static.parse(message)
   Assert.assertIs(message.type, "string")
   Assert.assertIs(message.src, "string")
 
-  local moduleName = ("lib.protocols.bannet.%s.packet.%s"):format(message.protocol, message.type)
+  local moduleName = ("lib.protocols.%s.packet.%s"):format(message.protocol, message.type)
   local ok, module, _ = pcall(require, moduleName)
   if not ok then
     Log.error(("Failed to load packet module '%s'"):format(moduleName))

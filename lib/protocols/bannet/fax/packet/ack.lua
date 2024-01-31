@@ -14,7 +14,7 @@ end
 function FaxAckPacket.static.parse(message)
   if message.type ~= "ack" then
     Log.error(("Invalid packet type for FaxAckPacket; expected 'ack' found '%s'"):format(message.type))
-    return nil, "invalid packet type"
+    error("invalid packet type")
   end
 
   local payload = message.payload

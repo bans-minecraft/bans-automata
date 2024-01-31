@@ -1,7 +1,7 @@
 local Assert = require("lib.assert")
 local Log = require("lib.log")
 local class = require("lib.class")
-local Packet = require("lib.protocols.packet")
+local Packet = require("lib.protocols.bannet.packet")
 local IcmpPongPacket = require("lib.protocols.bannet.icmp.packet.pong")
 
 local Node = class("Node")
@@ -79,12 +79,12 @@ function Node:run()
       if packet.protocol == "bannet.icmp" then
         self:handleIcmp(packet)
       else
-        ok, _, err = pcall(self.handlePacket, self, packet)
+        ok, err = pcall(self.handlePacket, self, packet)
         if not ok then
           Log.error(("Failed to process packet: %s"):format(err))
         end
       end
-    else
+    elseif err ~= nil then
       Log.error(("host '%s' failed to receive packet: %s"):format(self.address, err))
     end
   end
@@ -102,14 +102,19 @@ function Node:run()
   self.state = Node.State.Idle
 end
 
-function Node:recievePacket(timeout)
+function Node:receivePacket(timeout)
   local sender, message, protocol, result, packet, ok, err
 
   -- Receive a rednet packet.
   sender, message, protocol = rednet.receive(nil, timeout)
   if not sender then
     -- If we did not get a packet, then either there was a problem or we timed out.
-    return nil, nil, nil, "no message received or timed out"
+    return nil, nil, nil, nil
+  end
+
+  -- Ignore 'dns' protocol (part of rednet)
+  if protocol == "dns" then
+    return nil, nil, nil, nil
   end
 
   -- We should have received a table. That table should have a `protocol` field. We'll make sure
@@ -130,13 +135,12 @@ function Node:recievePacket(timeout)
 
   -- Try and parse the packet. Our generic `Packet` type will use module search to find correct
   -- packet for given protocol and payload type.
-  ok, result, err = pcall(Packet.parse, message)
+  ok, packet = pcall(Packet.parse, message)
   if not ok then
-    return nil, protocol, sender, err
+    return nil, protocol, sender, packet
   end
 
-  packet, err = table.unpack(result)
-  return packet, protocol, sender, err
+  return packet, protocol, sender, nil
 end
 
 function Node:handleIcmp(packet)

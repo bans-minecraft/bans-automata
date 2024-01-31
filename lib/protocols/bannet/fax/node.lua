@@ -1,5 +1,5 @@
 local class = require("lib.class")
-local Node = require("lib.protocol.node")
+local Node = require("lib.protocols.node")
 
 local FaxNode = class("FaxNode", Node)
 
