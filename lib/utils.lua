@@ -2,6 +2,16 @@ local Log = require("lib.log")
 
 local M = {}
 
+M.eraseAll = function(ts)
+  for i = 1, #ts do
+    table.remove(ts, i)
+  end
+
+  for i in pairs(ts) do
+    ts[i] = nil
+  end
+end
+
 M.concat = function(dest, src)
   for i = 1, #src do
     dest[#dest + 1] = src[i]
@@ -20,6 +30,18 @@ M.contains = function(ts, value)
   return false
 end
 
+M.is = function(value, classOrType)
+  if type(classOrType) == "string" then
+    return type(value) == classOrType
+  end
+
+  if type(value) ~= "table" then
+    return false
+  end
+
+  return value.__index == classOrType
+end
+
 M.isEmpty = function(ts)
   for _, value in pairs(ts) do
     if value ~= nil then
@@ -28,6 +50,21 @@ M.isEmpty = function(ts)
   end
 
   return true
+end
+
+M.clone = function(value)
+  local value_type = type(value)
+  if value_type == "nil" or value_type == "number" or value_type == "boolean" or value_type == "string" then
+    return value
+  elseif value_type == "table" then
+    if type(value.clone) == "function" then
+      return value:clone()
+    else
+      return M.cloneTable(value)
+    end
+  else
+    error(("Cannot clone value of type '%s'"):format(value_type))
+  end
 end
 
 M.cloneTable = function(ts)
@@ -111,6 +148,17 @@ end
 
 M.stringInsert = function(str, pos, text)
   return str:sub(1, pos - 1) .. text .. str:sub(pos)
+end
+
+M.generateId = function(length)
+  local id = ""
+
+  math.randomseed(os.clock() ^ 5)
+  for _ = 1, length do
+    id = id .. string.char(math.random(97, 122))
+  end
+
+  return id
 end
 
 return M

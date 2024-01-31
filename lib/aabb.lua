@@ -1,19 +1,14 @@
-local AABB = {}
-AABB.__index = AABB
-AABB.__name = "AABB"
+local class = require("lib.class")
 
-function AABB:create()
-  local instance = {
-    minX = math.huge,
-    minY = math.huge,
-    minZ = math.huge,
-    maxX = -math.huge,
-    maxY = -math.huge,
-    maxZ = -math.huge,
-  }
+local AABB = class("AABB")
 
-  setmetatable(instance, AABB)
-  return instance
+function AABB:init()
+  self.minX = math.huge
+  self.minY = math.huge
+  self.minZ = math.huge
+  self.maxX = -math.huge
+  self.maxY = -math.huge
+  self.maxZ = -math.huge
 end
 
 function AABB:addPoint(x, y, z)
@@ -23,6 +18,7 @@ function AABB:addPoint(x, y, z)
   self.maxX = math.max(self.maxX, x)
   self.maxY = math.max(self.maxY, y)
   self.maxZ = math.max(self.maxZ, z)
+  return self
 end
 
 function AABB:contains(x, y, z)
@@ -30,3 +26,4 @@ function AABB:contains(x, y, z)
 end
 
 return AABB
+

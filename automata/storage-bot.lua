@@ -469,7 +469,7 @@ function StoreBot:getMaterializedItems(uuids)
     -- Try and take the items from the digitizer
     result, err = turtle.suck(result.materialized)
     if not result then
-      Log.error("")
+      Log.error(("Failed to retrieve items from digitizer: %s"):format(err))
     end
 
     -- Pop the UUID from the list of UUIDs

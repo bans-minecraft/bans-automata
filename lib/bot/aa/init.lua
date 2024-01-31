@@ -25,31 +25,28 @@
 -- block.
 
 local Direction = require("lib.direction")
+local Assert = require("lib.assert")
 local Log = require("lib.log")
 local Utils = require("lib.utils")
 local Vector = require("lib.vector")
 local AANode = require("lib.bot.aa.node")
 local AAUtils = require("lib.bot.aa.utils")
+local class = require("lib.class")
 
 -- Area Awareness (AA)
 --
 -- This class encapsulates the AA graph, and provides some simple functions over that graph.
-local AA = {}
-AA.__index = AA
-AA.__name = "AA"
+local AA = class("AA")
 
-function AA:create()
-  local aa = {}
-  setmetatable(aa, AA)
-  aa.cache = {}
-  return aa
+function AA:init()
+  self.cache = {}
 end
 
-function AA:deserialize(data)
-  Log.assertIs(data, "table")
-  Log.assertIs(data.cache, "table")
+function AA.static.deserialize(data)
+  Assert.assertIs(data, "table")
+  Assert.assertIs(data.cache, "table")
 
-  local aa = AA:create()
+  local aa = AA:new()
   for key, value in pairs(data.cache) do
     aa.cache[key] = AANode:deserialize(value)
   end
@@ -78,10 +75,10 @@ end
 function AA:getNodeForward()
   local has_block, info = turtle.inspect()
   if not has_block then
-    return AANode:createEmpty()
+    return AANode.createEmpty()
   end
 
-  return AANode:createFromInfo(info)
+  return AANode.createFromInfo(info)
 end
 
 -- Acquire information about the block above the bot
@@ -90,10 +87,10 @@ end
 function AA:getNodeUp()
   local has_block, info = turtle.inspectUp()
   if not has_block then
-    return AANode:createEmpty()
+    return AANode.createEmpty()
   end
 
-  return AANode:createFromInfo(info)
+  return AANode.createFromInfo(info)
 end
 
 -- Acquire information about the block below the bot
@@ -102,10 +99,10 @@ end
 function AA:getNodeDown()
   local has_block, info = turtle.inspectDown()
   if not has_block then
-    return AANode:createEmpty()
+    return AANode.createEmpty()
   end
 
-  return AANode:createFromInfo(info)
+  return AANode.createFromInfo(info)
 end
 
 -- Get the `AANode` corresponding to the given hash key (index)
@@ -113,7 +110,7 @@ end
 -- If there is no such node in the AA, this will return a new `AANode` representing an unknown
 -- block.
 function AA:queryIndex(index)
-  return self.cache[index] or AANode:createUnknown()
+  return self.cache[index] or AANode.createUnknown()
 end
 
 -- Get the `AANode` corresponding to the given block position (as a `Vector`)
@@ -121,7 +118,7 @@ end
 -- If there is no such node in the AA, this will return a new `AANode` representing an unknown
 -- block.
 function AA:query(v)
-  return self.cache[AAUtils.positionKey(v)] or AANode:createUnknown()
+  return self.cache[AAUtils.positionKey(v)] or AANode.createUnknown()
 end
 
 -- Attempt a check whether the given block position (as a `Vector`) is an ore.
@@ -150,20 +147,173 @@ function AA:dump()
 end
 
 function AA:updateIndex(index, node)
-  Log.assertIs(index, "number")
-  Log.assertClass(node, AANode)
+  Assert.assertIs(index, "number")
+  Assert.assertInstance(node, AANode)
   self.cache[index] = node
 end
 
 function AA:update(v, node)
-  Log.assertClass(v, Vector)
-  Log.assertClass(node, AANode)
+  Assert.assertInstance(v, Vector)
+  Assert.assertInstance(node, AANode)
   self.cache[AAUtils.positionKey(v)] = node
 end
 
-function AA:buildPath(a, b, limit)
-  Log.assertClass(a, Vector)
-  Log.assertClass(b, Vector)
+local MinHeap = require("lib.min-heap")
+local OpenSet = class("OpenSet", MinHeap)
+
+function OpenSet:init()
+  MinHeap.init(self)
+  self.map = {}
+end
+
+function OpenSet:get(key)
+  return self.map[key]
+end
+
+function OpenSet:getPriority(node)
+  return node.fScore
+end
+
+function OpenSet:insert(x)
+  self.map[x.key] = x
+  return MinHeap.insert(self, x)
+end
+
+function OpenSet:remove(x)
+  local removed = MinHeap.remove(self, x)
+
+  if removed then
+    self.map[x.key] = nil
+  end
+
+  return removed
+end
+
+function OpenSet:pop()
+  local node = MinHeap.pop(self)
+  self.map[node.key] = nil
+  return node
+end
+
+local PathNode = class("PathNode")
+
+function PathNode:init(coord, fScore, gScore)
+  self.key = AAUtils.positionKey(coord)
+  self.coord = coord
+  self.fScore = fScore or 0
+  self.gScore = gScore or 0
+end
+
+-- Reconstruct a path from the `visited` table.
+--
+-- This will build the path, backwards, from the target (passed in `goal`) along all the visited
+-- nodes in the `visited` table. This returns a table of directions, where each direction indicates
+-- that the bot should take a step in that direction (e.g. `North, North, East, East`).
+local function reconstructPath(visited, goal)
+  local path = {}
+
+  while visited[goal] ~= nil do
+    table.insert(path, 1, visited[goal][1])
+    goal = visited[goal][2]
+  end
+
+  return path
+end
+
+M.reconstructPath = function(visited, goal)
+  local path = {}
+
+  while visited[goal] ~= nil do
+    table.insert(path, 1, visited[goal][1])
+    goal = visited[goal][2]
+  end
+
+  return path
+end
+
+-- Honestly, after a million steps we're getting really daft.
+local MAX_PATH_LENGTH = 1000000
+
+function AA:buildPath(start, target, limit)
+  Assert.assertInstance(start, Vector)
+  Assert.assertInstance(target, Vector)
+
+  -- If the block that we're targeting is known to be full, we cannot build a path there.
+  local targetNode = self:query(target)
+  if targetNode.state == AANode.FULL then
+    Log.error(("Cannot build a path to full block at %s"):format(target))
+    return nil
+  end
+
+  -- Ensure that the limit is sensible.
+  if type(limit) ~= "number" or limit < 0 then
+    limit = MAX_PATH_LENGTH
+  end
+
+  if limit > MAX_PATH_LENGTH then
+    Log.warn("Path limit of %d is too high, setting to %d", limit, MAX_PATH_LENGTH)
+    limit = MAX_PATH_LENGTH
+  end
+
+  local targetKey = AAUtils.positionKey(target)
+  local openSet = OpenSet:new()
+  local closedSet = {}
+  local visited = {}
+
+  -- Add the start node and it's score to the open set
+  openSet:insert(PathNode:new(start, AAUtils.costEstimate(start, target), 0))
+
+  while #openSet > 0 do
+    -- Get the node with the lowest fScore from the open set.
+    local current = openSet:pop()
+
+    -- If we've reached the goal, reconstruct the path and return it.
+    if current.key == targetKey then
+      return reconstructPath(visited, targetKey)
+    end
+
+    -- If we'e exceeded our path-finding limit, then abort.
+    if current.fScore >= limit then
+      Log.error(("Path-finding limit of %d reached (by %d)"):format(limit, current.fScore))
+      return nil
+    end
+
+    -- Add the current block to the closed set.
+    closedSet[current.key] = true
+
+    -- Scan in all six directions from the current block. If we find a neighbouring block that is
+    -- known to be empty, calculate the score for that neighbour and add it to the open set.
+    for dir = 0, 5 do
+      local n = Direction.offsetDirection(current.coord, dir)
+      local neighbourKey = AAUtils.positionKey(n)
+      local neighbour = self:queryIndex(neighbourKey)
+
+      -- If the neighbour block in the direction `dir` is known to be `EMPTY` (by `AANode` status),
+      -- and it is not already present in the closed set, then calculate the score and add it to the
+      -- open set.
+      if neighbour.state == AANode.EMPTY and closedSet[neighbourKey] == nil then
+        -- The goal score for a neighbour is simply the cost of the `current` block plus one: ew're
+        -- moving one block at a time.
+        local gScore = current.gScore + 1
+
+        -- If the neighbour is not already in the open set, or the new score in `g` is better
+        -- (lower) than the score we previously recorded for this block, then we can add it to the
+        -- open set. This ensures that we do not repeatedly add blocks to the open set, unless the
+        -- score will be improved since we last added them.
+        local existing = openSet:get(neighbourKey)
+        if existing == nil or gScore < existing.gScore then
+          visited[neighbourKey] = { dir, current.key }
+          openSet:remove(existing)
+          openSet:insert(PathNode:new(n, gScore + AAUtils.costEstimate(n, target), gScore))
+        end
+      end
+    end
+  end
+end
+
+function AA:buildPathOld(a, b, limit)
+  Assert.assertInstance(a, Vector)
+  Assert.assertInstance(b, Vector)
 
   -- if the block that we're targeting is known to be full, we cannot build a path there.
   local target = self:query(b)
@@ -253,3 +403,4 @@ function AA:buildPath(a, b, limit)
 end
 
 return AA
+

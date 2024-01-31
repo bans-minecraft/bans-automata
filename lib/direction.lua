@@ -1,6 +1,8 @@
-local Vector = require("lib.vector")
+local Assert = require("lib.assert")
 local Log = require("lib.log")
 local Utils = require("lib.utils")
+local Vector = require("lib.vector")
+local class = require("lib.class")
 
 -- A direction
 --
@@ -81,7 +83,7 @@ end
 -- For any valid direction `dir`, this function will scale the direction vector by the number `d`
 -- (defaulting to 1) and return `v + d * dirOffset(dir)`.
 M.offsetDirection = function(v, dir, d)
-  Log.assertClass(v, Vector)
+  Assert.assertInstance(v, Vector)
 
   if type(d) ~= "number" then
     d = 1
@@ -123,29 +125,17 @@ M.directionSide = function(facing, direction)
   return SIDE_INDICES[1 + (direction - facing + 3) % 4]
 end
 
-local DirSeqStep = {}
-DirSeqStep.__index = DirSeqStep
-DirSeqStep.__name = "DirSeqStep"
+local DirSeqStep = class("DirSeqStep")
 
-function DirSeqStep:create(direction, count)
-  local step = {}
-  setmetatable(step, DirSeqStep)
-
+function DirSeqStep:init(direction, count)
   M.assertDir(direction)
-  step.direction = direction
-  step.count = Utils.numberOrDefault(count, 1)
-
-  return step
+  self.direction = direction
+  self.count = Utils.numberOrDefault(count, 1)
 end
 
-local DirSeq = {}
-DirSeq.__index = DirSeq
-DirSeq.__name = "DirSeq"
+local DirSeq = class("DirSeq")
 
-function DirSeq:create()
-  local seq = { steps = {} }
-  setmetatable(seq, DirSeq)
-  return seq
+function DirSeq:init()
 end
 
 function DirSeq:finish()
@@ -153,7 +143,7 @@ function DirSeq:finish()
 end
 
 function DirSeq:add(step)
-  Log.assertClass(step, DirSeqStep)
+  Assert.assertInstance(step, DirSeqStep)
   table.insert(self.steps, step)
 end
 
@@ -191,7 +181,8 @@ M.DirSeqStep = DirSeqStep
 M.DirSeq = DirSeq
 
 M.seq = function()
-  return DirSeq:create()
+  return DirSeq:new()
 end
 
 return M
+

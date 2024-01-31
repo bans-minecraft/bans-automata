@@ -1,59 +1,53 @@
-local Direction = require("lib.direction")
-local Vector = require("lib.vector")
-local Utils = require("lib.utils")
-local Log = require("lib.log")
 local AA = require("lib.bot.aa")
 local AANode = require("lib.bot.aa.node")
+local Assert = require("lib.assert")
+local Direction = require("lib.direction")
+local Log = require("lib.log")
+local Utils = require("lib.utils")
+local Vector = require("lib.vector")
+local class = require("lib.class")
 
 -- The Bot class
 --
 -- This class provides the functionality for diving the bot, performing mining actions, and
 -- maintaining the AA.
+--
+-- The `Bot` class extneds the `Actor` class to allow events, state and actions
+local Bot = class("Bot")
 
-local Bot = {}
-Bot.__index = Bot
-Bot.__name = "Bot"
-
-Bot.FUEL_SLOT = 16  -- Inventory slot in which fuel is stored (default: 16)
-Bot.MIN_FUEL = 1000 -- Minimum fiel required for operation (default: 1000)
-
-function Bot:create(dir)
-  local bot = {}
-  setmetatable(bot, Bot)
-
+function Bot:init(dir)
   -- We keep track of the slot into which we should pace fuel, and the minimum amount of fuel that
   -- we need to operate.
-  bot.fuelSlot = Bot.FUEL_SLOT
-  bot.minFuel = Bot.MIN_FUEL
+  self.fuelSlot = 16
+  self.minFuel = 1000
 
   -- The current position and direction of the bot. The position is typically relative to the start
   -- of the bot's process (often referred to as the "home" position). The direction should be the
   -- global (world) direction, as seen in the F3 debug overlay. if no direction is given in the
   -- `dir` argument to this constructor, we default to North.
-  bot.pos = Vector:create()
-  bot.start = Vector:create()
-  bot.dir = dir or Direction.North
+  self.pos = Vector:create()
+  self.start = Vector:create()
+  self.dir = dir or Direction.North
 
   -- Create the Area Awareness system
-  bot.aa = AA:create()
+  self.aa = AA:create()
 
   -- When the bot is created, perform a scan around our immediate environment to initialize the AA.
-  bot:cacheAround()
-  return bot
+  self:cacheAround()
 end
 
-function Bot:deserialize(data)
-  Log.assertIs(data, "table")
-  Log.assertIs(data.fuelSlot, "number")
-  Log.assertIs(data.minFuel, "number")
-  Log.assertIs(data.dir, "number")
+function Bot.static.deserialize(data)
+  Assert.assertIs(data, "table")
+  Assert.assertIs(data.fuelSlot, "number")
+  Assert.assertIs(data.minFuel, "number")
+  Assert.assertIs(data.dir, "number")
 
-  local bot = Bot:create(data.dir)
+  local bot = Bot:new(data.dir)
   bot.fuelSlot = data.fuelSlot
   bot.minFuel = data.minFuel
-  bot.pos = Vector:deserialize(data.pos)
-  bot.start = Vector:deserialize(data.start)
-  bot.aa = AA:deserialize(data.aa)
+  bot.pos = Vector.deserialize(data.pos)
+  bot.start = Vector.deserialize(data.start)
+  bot.aa = AA.deserialize(data.aa)
 
   return bot
 end
@@ -117,7 +111,7 @@ function Bot:cacheBlockDown()
 end
 
 function Bot:cacheBlocks()
-  self.aa:update(self.pos, AANode:createEmpty())
+  self.aa:update(self.pos, AANode.createEmpty())
   self:cacheBlockFront()
   self:cacheBlockUp()
   self:cacheBlockDown()
@@ -125,7 +119,7 @@ end
 
 function Bot:query(dir, refresh)
   local v = self:relativePosition(dir)
-  local node = refresh and AANode:createUnknown() or self.aa:query(v)
+  local node = refresh and AANode.createUnknown() or self.aa:query(v)
 
   if node.state == AANode.UNKNOWN then
     if dir == Direction.Up then
@@ -389,7 +383,7 @@ end
 function Bot:move(steps)
   local ok, err, move, count
 
-  Log.assertIs(steps, "table")
+  Assert.assertIs(steps, "table")
   if steps.__index == Direction.DirSeq then
     steps = steps:finish()
   end

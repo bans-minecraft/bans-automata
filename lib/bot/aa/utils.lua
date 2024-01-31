@@ -1,4 +1,4 @@
-local Log = require("lib.log")
+local Assert = require("lib.assert")
 local Vector = require("lib.vector")
 
 local M = {}
@@ -12,13 +12,13 @@ local M = {}
 -- See: https://en.wikipedia.org/wiki/Taxicab_geometry
 --
 M.costEstimate = function(a, b)
-  Log.assertClass(a, Vector)
-  Log.assertClass(b, Vector)
+  Assert.assertClass(a, Vector)
+  Assert.assertClass(b, Vector)
   return math.abs(b.x - a.x) + math.abs(b.y - a.y) + math.abs(b.z - a.z)
 end
 
 M.positionKey = function(v)
-  Log.assertClass(v, Vector)
+  Assert.assertInstance(v, Vector)
   return ("%.0f:%.0f:%.0f"):format(v.x, v.y, v.z)
 end
 
@@ -38,3 +38,4 @@ M.reconstructPath = function(visited, goal)
 end
 
 return M
+

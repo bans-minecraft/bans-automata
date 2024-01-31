@@ -1,32 +1,29 @@
-local Log = require("lib.log")
+local Assert = require("lib.assert")
+local class = require("lib.class")
 
-local M = {}
-M.__index = M
-M.__name = "Vector"
+local Vector = class("Vector")
 
-function M:create(...)
+function Vector:init(...)
   local args = { ... }
-  local v = {}
-  setmetatable(v, M)
 
   if #args == 0 then
-    v.x = 0
-    v.y = 0
-    v.z = 0
+    self.x = 0
+    self.y = 0
+    self.z = 0
   elseif #args == 1 then
     if type(args[1]) == "number" then
-      v.x = args[1]
-      v.y = args[1]
-      v.z = args[1]
+      self.x = args[1]
+      self.y = args[1]
+      self.z = args[1]
     elseif type(args[1]) == "table" then
       if args[1].x ~= nil then
-        v.x = args[1].x
-        v.y = args[1].y
-        v.z = args[1].z
+        self.x = args[1].x
+        self.y = args[1].y
+        self.z = args[1].z
       elseif args[1][1] ~= nil then
-        v.x = args[1][1]
-        v.y = args[1][2]
-        v.z = args[1][3]
+        self.x = args[1][1]
+        self.y = args[1][2]
+        self.z = args[1][3]
       else
         error("Invalid argument to Vector constructor")
       end
@@ -34,41 +31,39 @@ function M:create(...)
       error("Invalid argument to Vector constructor")
     end
   elseif #args == 3 then
-    v.x = args[1]
-    v.y = args[2]
-    v.z = args[3]
+    self.x = args[1]
+    self.y = args[2]
+    self.z = args[3]
   else
     error("Invalid argument to Vector constructor")
   end
-
-  return v
 end
 
-function M:clone()
-  local v = M:create()
+function Vector:clone()
+  local v = Vector:new()
   v.x = self.x
   v.y = self.y
   v.z = self.z
   return v
 end
 
-function M:deserialize(data)
-  Log.assertIs(data, "table")
-  Log.assertIs(data.x, "number")
-  Log.assertIs(data.y, "number")
-  Log.assertIs(data.z, "number")
-  return M:create(data.x, data.y, data.z)
+function Vector.static.deserialize(data)
+  Assert.assertIs(data, "table")
+  Assert.assertIs(data.x, "number")
+  Assert.assertIs(data.y, "number")
+  Assert.assertIs(data.z, "number")
+  return Vector:new(data.x, data.y, data.z)
 end
 
-function M:serialize()
+function Vector:serialize()
   return { x = self.x, y = self.y, z = self.z }
 end
 
-function M:__tostring()
+function Vector:__tostring()
   return ("%f:%f:%f"):format(self.x, self.y, self.z)
 end
 
-function M:add(other, result)
+function Vector:add(other, result)
   result = result or self
   result.x = self.x + other.x
   result.y = self.y + other.y
@@ -76,7 +71,7 @@ function M:add(other, result)
   return result
 end
 
-function M:sub(other, result)
+function Vector:sub(other, result)
   result = result or self
   result.x = self.x + other.x
   result.y = self.y + other.y
@@ -84,7 +79,7 @@ function M:sub(other, result)
   return result
 end
 
-function M:scale(scale, result)
+function Vector:scale(scale, result)
   result = result or self
   result.x = self.x * scale
   result.y = self.y * scale
@@ -92,20 +87,21 @@ function M:scale(scale, result)
   return result
 end
 
-function M:eq(other)
+function Vector:eq(other)
   return self.x == other.x and self.y == other.y and self.z == other.z
 end
 
-function M:neq(other)
+function Vector:neq(other)
   return self.x ~= other.x or self.y ~= other.y or self.z ~= other.z
 end
 
-function M:__add(v)
-  return self:add(v, M:create())
+function Vector:__add(v)
+  return self:add(v, Vector:new())
 end
 
-function M:__sub(v)
-  return self:sub(v, M:create())
+function Vector:__sub(v)
+  return self:sub(v, Vector:new())
 end
 
-return M
+return Vector
+

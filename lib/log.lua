@@ -1,10 +1,21 @@
-local pretty = require("cc.pretty")
+local pretty = pcall(require, "cc.pretty")
+local prettyPrint
+if pretty then
+  prettyPrint = function(value, width)
+    return pretty.render(pretty.pretty(value), width)
+  end
+else
+  local inspect = require("inspect")
+  prettyPrint = function(value, width)
+    return inspect(value)
+  end
+end
 
 local M = {}
 M.level = {
-  info = { "INFO ", colors.cyan },
-  warn = { "WARN ", colors.yellow },
-  error = { "ERROR", colors.red },
+  info = { "INFO ", colors and colors.cyan },
+  warn = { "WARN ", colors and colors.yellow },
+  error = { "ERROR", colors and colors.red },
 }
 
 M.logfile = nil
@@ -17,7 +28,7 @@ M.setLogFile = function(name, fresh)
 end
 
 M.write = function(level, message)
-  if level then
+  if term and level then
     term.setTextColor(level[2])
   end
 
@@ -28,7 +39,9 @@ M.write = function(level, message)
   end
 
   print(message)
-  term.setTextColor(colors.white)
+  if term and colors then
+    term.setTextColor(colors.white)
+  end
 
   if M.logfile ~= nil then
     local file = fs.open(M.logfile, "a")
@@ -50,7 +63,7 @@ M.log = function(level, ...)
     elseif v == nil then
       table.insert(args, "nil")
     else
-      table.insert(args, pretty.render(pretty.pretty(v), 30))
+      table.insert(args, prettyPrint(v, 30))
     end
   end
 
@@ -66,38 +79,6 @@ for level, _ in pairs(M.level) do
   end
 end
 
-M.assert = function(value, message)
-  if not value then
-    if message then
-      error("Assertion failed: " + message)
-    else
-      error("Assertion failed")
-    end
-  end
-end
-
-M.assertIs = function(value, type_name)
-  if type(value) ~= type_name then
-    M.error("Assertion failed: expected", type_name, "found", type(value))
-  end
-end
-
-M.assertClass = function(value, class)
-  if type(value) ~= "table" then
-    local message = ("Assertion failed: expected '%s' found '%s'"):format(class.__name, type(value))
-    error(message)
-  end
-
-  if value.__index ~= class then
-    local found = type(value)
-    if value.__index and value.__index.__name then
-      found = value.__index.__name
-    end
-
-    local message = ("Assertion failed: expected '%s' found '%s'"):format(class.__name, found)
-    error(message)
-  end
-end
 
 local function trapHandler(err)
   M.error("Error called:", err)
@@ -114,3 +95,4 @@ M.trap = function(func, ...)
 end
 
 return M
+
