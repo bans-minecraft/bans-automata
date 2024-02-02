@@ -1,3 +1,4 @@
+local Assert = require("lib.assert")
 local Log = require("lib.log")
 
 local M = {}
@@ -107,7 +108,7 @@ M.loadConfig = function(config_path, defaults)
   file.close()
 
   local config = textutils.unserialize(contents)
-  Log.assertIs(config, "table")
+  Assert.assertIs(config, "table")
 
   return M.applyDefaults(config, defaults or {})
 end
@@ -117,7 +118,7 @@ M.numberOrDefault = function(value, default)
     return default
   end
 
-  Log.assertIs(value, "number")
+  Assert.assertIs(value, "number")
   return value
 end
 

@@ -381,6 +381,7 @@ function FaxReceiver:materializeStack(uuid)
     return false
   end
 
+  Log.info(("Materialized %dx %s"):format(result.materialized, sim.item.name))
   return true
 end
 

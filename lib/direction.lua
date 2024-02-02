@@ -136,6 +136,7 @@ end
 local DirSeq = class("DirSeq")
 
 function DirSeq:init()
+  self.steps = {}
 end
 
 function DirSeq:finish()
@@ -148,32 +149,32 @@ function DirSeq:add(step)
 end
 
 function DirSeq:north(count)
-  self:add(DirSeqStep:create(M.North, count))
+  self:add(DirSeqStep:new(M.North, count))
   return self
 end
 
 function DirSeq:south(count)
-  self:add(DirSeqStep:create(M.South, count))
+  self:add(DirSeqStep:new(M.South, count))
   return self
 end
 
 function DirSeq:east(count)
-  self:add(DirSeqStep:create(M.East, count))
+  self:add(DirSeqStep:new(M.East, count))
   return self
 end
 
 function DirSeq:west(count)
-  self:add(DirSeqStep:create(M.West, count))
+  self:add(DirSeqStep:new(M.West, count))
   return self
 end
 
 function DirSeq:up(count)
-  self:add(DirSeqStep:create(M.Up, count))
+  self:add(DirSeqStep:new(M.Up, count))
   return self
 end
 
 function DirSeq:down(count)
-  self:add(DirSeqStep:create(M.Down, count))
+  self:add(DirSeqStep:new(M.Down, count))
   return self
 end
 

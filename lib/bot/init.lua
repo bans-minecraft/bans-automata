@@ -384,7 +384,7 @@ function Bot:move(steps)
   local ok, err, move, count
 
   Assert.assertIs(steps, "table")
-  if steps.__index == Direction.DirSeq then
+  if Direction.DirSeq:isInstance(steps) then
     steps = steps:finish()
   end
 
