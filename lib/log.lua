@@ -19,6 +19,11 @@ M.level = {
 }
 
 M.logfile = nil
+M.echo = true
+
+M.setEcho = function(echo)
+  M.echo = echo
+end
 
 M.setLogFile = function(name, fresh)
   M.logfile = name
@@ -28,7 +33,7 @@ M.setLogFile = function(name, fresh)
 end
 
 M.write = function(level, message)
-  if term and level then
+  if M.echo and term and level then
     term.setTextColor(level[2])
   end
 
@@ -38,9 +43,11 @@ M.write = function(level, message)
     message = ("        %s"):format(message)
   end
 
-  print(message)
-  if term and colors then
-    term.setTextColor(colors.white)
+  if M.echo then
+    print(message)
+    if term and colors then
+      term.setTextColor(colors.white)
+    end
   end
 
   if M.logfile ~= nil then

@@ -10,6 +10,26 @@ M.assert = function(value, message)
   end
 end
 
+M.assertEq = function(value, expected, message)
+  if value ~= expected then
+    if message then
+      error("Assertion failed: " .. message)
+    else
+      error(("Assertion failed: expected '%s' to be equal to '%s'"):format(value, expected))
+    end
+  end
+end
+
+M.assertNeq = function(value, expected, message)
+  if value == expected then
+    if message then
+      error("Assertion failed: " .. message)
+    else
+      error(("Assertion failed: expected '%s' to not be equal to '%s'"):format(value, expected))
+    end
+  end
+end
+
 M.assertIs = function(value, type_name, messageOpt)
   local message
   if messageOpt ~= nil then

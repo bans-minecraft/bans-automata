@@ -151,10 +151,25 @@ M.stringInsert = function(str, pos, text)
   return str:sub(1, pos - 1) .. text .. str:sub(pos)
 end
 
+local ELLIPSIS = "..."
+local ELLIPSIS_LEN = #ELLIPSIS
+
+M.ellipsize = function(str, width)
+  if #str > width then
+    if width < ELLIPSIS_LEN then
+      return ELLIPSIS:sub(1, width)
+    end
+
+    return str:sub(1, width - ELLIPSIS_LEN) .. ELLIPSIS
+  end
+
+  return str
+end
+
 M.generateId = function(length)
   local id = ""
 
-  math.randomseed(os.clock() ^ 5)
+  math.randomseed(os.epoch() ^ 5)
   for _ = 1, length do
     id = id .. string.char(math.random(97, 122))
   end
