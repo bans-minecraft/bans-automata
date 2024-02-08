@@ -60,7 +60,7 @@ function Vector:serialize()
 end
 
 function Vector:__tostring()
-  return ("%f:%f:%f"):format(self.x, self.y, self.z)
+  return ("[instance Vector(%f, %f, %f)]"):format(self.x, self.y, self.z)
 end
 
 function Vector:add(other, result)
@@ -104,4 +104,3 @@ function Vector:__sub(v)
 end
 
 return Vector
-

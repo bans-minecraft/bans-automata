@@ -17,7 +17,7 @@ function Rect.static.make(row, col, width, height)
 end
 
 function Rect.static.createEmpty()
-  return Rect:new(Coord:new(1, 1), Size:new(0, 0))
+  return Rect:new(Coord:new(0, 0), Size:new(0, 0))
 end
 
 function Rect.static.deserialize(data)
@@ -39,7 +39,12 @@ function Rect:clone()
 end
 
 function Rect:__tostring()
-  return ("%s;%s"):format(self.position, self.size)
+  return ("[instance Rect(r%d, c%d; %d x %d)]"):format(
+    self.position.row,
+    self.position.col,
+    self.size.width,
+    self.size.height
+  )
 end
 
 return Rect

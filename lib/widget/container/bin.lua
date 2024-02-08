@@ -9,14 +9,6 @@ function Bin:init()
   self.child = nil
 end
 
-function Bin:destroy()
-  if self.child then
-    self.child:destroy()
-  end
-
-  Widget.destroy(self)
-end
-
 function Bin:setChild(child)
   Assert.assertInstance(child, Widget)
   Assert.assertEq(child.parent, nil)

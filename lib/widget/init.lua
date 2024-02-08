@@ -13,16 +13,9 @@ function Widget:init()
   self.size = Size:new(0, 0)
 end
 
-function Widget:destroy()
-  if self.parent ~= nil then
-    self.parent:removeChild(self)
-  end
-end
-
 function Widget:setVisible(visible)
   Assert.assertIs(visible, "boolean")
   self.visible = visible
-  self:queueRedraw()
 end
 
 function Widget:hide()
@@ -31,6 +24,10 @@ end
 
 function Widget:show()
   self:setVisible(true)
+end
+
+function Widget:queueRedraw()
+  if self.parent ~= nil then self.parent:queueRedraw() end
 end
 
 function Widget:getSizeRequest()
@@ -44,9 +41,6 @@ end
 
 function Widget:render(context)
   Assert.assertInstance(context, RenderContext)
-end
-
-function Widget:queueRedraw()
 end
 
 return Widget

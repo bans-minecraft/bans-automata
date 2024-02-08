@@ -31,7 +31,7 @@ function Size:expand(width, height)
 end
 
 function Size:__tostring()
-  return ("%dx%d"):format(self.width, self.height)
+  return ("[instance Size(%d x %d)]"):format(self.width, self.height)
 end
 
 return Size

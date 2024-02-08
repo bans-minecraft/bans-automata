@@ -1,7 +1,7 @@
 local Assert = require("lib.assert")
 local Class = require("lib.class")
+local Coord = require("lib.coord")
 local Size = require("lib.size")
-local Log = require("lib.log")
 local Requisition = require("lib.widget.requisition")
 local Widget = require("lib.widget")
 local Utils = require("lib.utils")
@@ -70,22 +70,19 @@ end
 
 function Label:getSizeRequest()
   local minimum = Size:new(1, 1)
-  local natural = Size:new(#self.text, 1)
+  local natural = Size:new(math.max(1, #self.text), 1)
   return Requisition:new(minimum, natural)
 end
 
 function Label:setAllocation(allocation)
   Widget.setAllocation(self, allocation)
-  Log.info(("Label:setAllocation allocation = %s"):format(allocation))
 end
 
 function Label:render(context)
-  Log.info(("Label:render allocation = %s"):format(self.allocation))
-  Widget.render(self, context)
-  context:renderRect(self.allocation, self.bgColor)
+  context:clear(self.bgColor)
 
-  local visible = Utils.ellipsize(self.text, self.allocation.size.width)
-  context:renderString(self.allocation.position, visible, self.bgColor, self.fgColor)
+  local visible = Utils.ellipsize(self.text, context:getWidth())
+  context:renderString(Coord:new(0, 0), visible, self.fgColor, self.bgColor)
 end
 
 return Label

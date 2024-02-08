@@ -31,7 +31,7 @@ function Coord:toIndex(stride)
 end
 
 function Coord:__tostring()
-  return ("r%d:c%d"):format(self.row, self.col)
+  return ("[instance Coord(r%d,c%d)]"):format(self.row, self.col)
 end
 
 return Coord

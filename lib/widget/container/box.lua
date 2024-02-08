@@ -4,12 +4,11 @@ local Widget = require("lib.widget")
 local Child = require("lib.widget.container.child")
 local Size = require("lib.size")
 local Rect = require("lib.rect")
-local Log = require("lib.log")
 local Requisition = require("lib.widget.requisition")
 
-local Container = Class("Container", Widget)
+local Box = Class("Box", Widget)
 
-function Container:init(orientation)
+function Box:init(orientation)
   Assert.assertIs(orientation, "string")
   Widget.init(self)
   self.border = 0
@@ -19,21 +18,7 @@ function Container:init(orientation)
   self.orientation = orientation
 end
 
-function Container:destroy()
-  local to_remove = {}
-  for _, child in ipairs(self.children) do
-    table.insert(to_remove, child.widget)
-  end
-
-  for _, child in ipairs(to_remove) do
-    child:destroy()
-  end
-
-  Assert.assertEq(#self.children, 0)
-  Widget.destroy(self)
-end
-
-function Container:getChildIndex(widget)
+function Box:getChildIndex(widget)
   for index, child in ipairs(self.children) do
     if child.widget == widget then
       return index
@@ -43,7 +28,7 @@ function Container:getChildIndex(widget)
   return nil
 end
 
-function Container:addChild(widget, packing, expand, fill, padding)
+function Box:addChild(widget, packing, expand, fill, padding)
   Assert.assertInstance(widget, Widget)
   Assert.assertEq(widget.parent, nil)
   local child = Child:new(widget)
@@ -73,7 +58,7 @@ function Container:addChild(widget, packing, expand, fill, padding)
   self:queueRedraw()
 end
 
-function Container:removeChild(widget)
+function Box:removeChild(widget)
   Assert.assertInstance(widget, Widget)
   Assert.assertEq(widget.parent, self)
   local index = self:getChildIndex(widget)
@@ -83,7 +68,7 @@ function Container:removeChild(widget)
   self:queueRedraw()
 end
 
-function Container:insertChild(index, widget)
+function Box:insertChild(index, widget)
   Assert.assertInstance(widget, Widget)
   Assert.assertEq(widget.parent, nil)
   table.insert(self.children, index, Child:new(widget))
@@ -91,19 +76,19 @@ function Container:insertChild(index, widget)
   self:queueRedraw()
 end
 
-function Container:setSpacing(spacing)
+function Box:setSpacing(spacing)
   Assert.assertIs(spacing, "number")
   self.spacing = spacing
   self:queueRedraw()
 end
 
-function Container:setHomogeneous(active)
+function Box:setHomogeneous(active)
   Assert.assertIs(active, "boolean")
   self.homogeneous = active
   self:queueRedraw()
 end
 
-function Container:getChildForWidget(widget)
+function Box:getChildForWidget(widget)
   Assert.assertInstance(widget, Widget)
   local index = self:getChildIndex(widget)
   if index ~= nil then
@@ -113,7 +98,7 @@ function Container:getChildForWidget(widget)
   return nil
 end
 
-function Container:_getChildForWidgetOrIndex(widgetOrIndex)
+function Box:_getChildForWidgetOrIndex(widgetOrIndex)
   if type(widgetOrIndex) == "number" then
     Assert.assert(widgetOrIndex >= 1 and widgetOrIndex <= #self.children,
       ("Child index %d is out of range 1..%d"):format(widgetOrIndex, #self.children))
@@ -124,7 +109,7 @@ function Container:_getChildForWidgetOrIndex(widgetOrIndex)
   end
 end
 
-function Container:setChildPadding(widgetOrIndex, padding)
+function Box:setChildPadding(widgetOrIndex, padding)
   Assert.assertIs(padding, "number")
   local child = self:_getChildForWidgetOrIndex(widgetOrIndex)
   Assert.assertInstance(child, Widget)
@@ -132,7 +117,7 @@ function Container:setChildPadding(widgetOrIndex, padding)
   self:queueRedraw()
 end
 
-function Container:setChildExpand(widgetOrIndex, expand)
+function Box:setChildExpand(widgetOrIndex, expand)
   Assert.assertIs(expand, "boolean")
   local child = self:_getChildForWidgetOrIndex(widgetOrIndex)
   Assert.assertInstance(child, Widget)
@@ -140,7 +125,7 @@ function Container:setChildExpand(widgetOrIndex, expand)
   self:queueRedraw()
 end
 
-function Container:setChildFill(widgetOrIndex, fill)
+function Box:setChildFill(widgetOrIndex, fill)
   Assert.assertIs(fill, "boolean")
   local child = self:_getChildForWidgetOrIndex(widgetOrIndex)
   Assert.assertInstance(child, Widget)
@@ -148,13 +133,13 @@ function Container:setChildFill(widgetOrIndex, fill)
   self:queueRedraw()
 end
 
-function Container:setOrientation(orientation)
+function Box:setOrientation(orientation)
   Assert.assertIs(orientation, "string")
   self.orientation = orientation
   self:queueRedraw()
 end
 
-function Container:getSizeRequest()
+function Box:getSizeRequest()
   local min = Size:new(0, 0)
   local natural = Size:new(0, 0)
 
@@ -172,14 +157,14 @@ function Container:getSizeRequest()
       min.height = math.max(min.height, child.reqMinimum.height)
 
       natural.width = natural.width + child.reqNatural.width
-      natural.height = math.max(natural.height + child.reqNatural.height)
+      natural.height = math.max(natural.height, child.reqNatural.height)
     end
   end
 
   return Requisition:new(min, natural)
 end
 
-function Container:countExpandedChildren()
+function Box:countExpandedChildren()
   local visible = 0
   local expanded = 0
 
@@ -195,10 +180,12 @@ function Container:countExpandedChildren()
   return visible, expanded
 end
 
-function Container:render(context)
+function Box:render(context)
   for _, child in ipairs(self.children) do
     if child.widget.visible then
+      context:enterRegion(child.allocation)
       child.widget:render(context)
+      context:leaveRegion()
     end
   end
 end
@@ -215,7 +202,7 @@ local function compareGap(sizes, a, b)
   return delta
 end
 
-function Container:setAllocation(allocation)
+function Box:setAllocation(allocation)
   Widget.setAllocation(self, allocation)
   local visible, expanded = self:countExpandedChildren()
 
@@ -365,7 +352,7 @@ function Container:setAllocation(allocation)
               end
             end
 
-            child.widget:setAllocation(child_allocation)
+            child:setAllocation(child_allocation)
           end
 
           index = index + 1
@@ -375,4 +362,4 @@ function Container:setAllocation(allocation)
   end
 end
 
-return Container
+return Box

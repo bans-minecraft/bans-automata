@@ -16,10 +16,13 @@ function Child:init(widget)
   self.fill = false
   self.packing = "start"
 
+  -- The requisition that we receive from the child widget.
   self.requisition = Requisition:new(Size:new(0, 0), Size:new(0, 0))
   self.reqMinimum = Size:new(0, 0)
   self.reqNatural = Size:new(0, 0)
 
+  -- The allocation that we assign to the child widget. We keep this hanging around so that we might
+  -- make use of it at other times without relying on the child widget.
   self.allocation = Rect:new(Coord:new(1, 1), Size:new(0, 0))
 end
 

@@ -1,10 +1,10 @@
 local Class = require("lib.class")
-local Container = require("lib.widget.container")
+local Box = require("lib.widget.container.box")
 
-local VBox = Class("VBox", Container)
+local VBox = Class("VBox", Box)
 
 function VBox:init()
-  Container.init(self, "vertical")
+  Box.init(self, "vertical")
 end
 
 return VBox
