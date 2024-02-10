@@ -27,7 +27,7 @@
 local Direction = require("lib.direction")
 local Assert = require("lib.assert")
 local Log = require("lib.log")
-local Utils = require("lib.utils")
+local Table = require("lib.table")
 local Vector = require("lib.vector")
 local AANode = require("lib.bot.aa.node")
 local AAUtils = require("lib.bot.aa.utils")
@@ -332,7 +332,7 @@ function AA:buildPathOld(a, b, limit)
   gScore[startIndex] = 0
   fScore[startIndex] = AAUtils.costEstimate(a, b)
 
-  while not Utils.isEmpty(openSet) do
+  while not Table.isEmpty(openSet) do
     local fCurrent = 9999999
     local current      -- a Vector
     local currentIndex -- a string index

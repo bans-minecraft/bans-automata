@@ -1,3 +1,5 @@
+local Types = require("lib.types")
+
 local M = {}
 
 M.assert = function(value, message)
@@ -31,15 +33,58 @@ M.assertNeq = function(value, expected, message)
 end
 
 M.assertIs = function(value, type_name, messageOpt)
-  local message
-  if messageOpt ~= nil then
-    message = ("Assertion failed: %s"):format(message)
-  else
-    message = ("Assertion failed: expected '%s'; found '%s'"):format(type_name, type(value))
-  end
-
   if type(value) ~= type_name then
-    error(message)
+    if messageOpt ~= nil then
+      error(("Assertion failed: %s"):format(messageOpt))
+    else
+      error(("Assertion failed: expected '%s'; found '%s'"):format(type_name), type(value))
+    end
+  end
+end
+
+M.assertIsNil = function(value, messageOpt) M.assert(value == nil, messageOpt or "expected value to be nil") end
+M.assertIsBoolean = function(value, messageOpt) M.assertIs(value, "boolean", messageOpt) end
+M.assertIsNumber = function(value, messageOpt) M.assertIs(value, "number", messageOpt) end
+M.assertIsString = function(value, messageOpt) M.assertIs(value, "string", messageOpt) end
+M.assertIsTable = function(value, messageOpt) M.assertIs(value, "table", messageOpt) end
+
+M.assertIsCallable = function(value, messageOpt)
+  if Types.isCallable(value) then
+    if messageOpt ~= nil then
+      error(("Assertion failed: %s"):format(messageOpt))
+    else
+      error(("Assertion failed: expected callable; found '%s'"):format(type(value)))
+    end
+  end
+end
+
+M.assertIsIndexable = function(value, messageOpt)
+  if Types.isIndexable(value) then
+    if messageOpt ~= nil then
+      error(("Assertion failed: %s"):format(messageOpt))
+    else
+      error(("Assertion failed: expected indexable; found '%s'"):format(type(value)))
+    end
+  end
+end
+
+M.assertIsIterable = function(value, messageOpt)
+  if Types.isIterable(value) then
+    if messageOpt ~= nil then
+      error(("Assertion failed: %s"):format(messageOpt))
+    else
+      error(("Assertion failed: expected iterable; found '%s'"):format(type(value)))
+    end
+  end
+end
+
+M.assertIsWritable = function(value, messageOpt)
+  if Types.isWritable(value) then
+    if messageOpt ~= nil then
+      error(("Assertion failed: %s"):format(messageOpt))
+    else
+      error(("Assertion failed: expected writable; found '%s'"):format(type(value)))
+    end
   end
 end
 

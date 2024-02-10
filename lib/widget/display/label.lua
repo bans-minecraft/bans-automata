@@ -4,7 +4,7 @@ local Coord = require("lib.coord")
 local Size = require("lib.size")
 local Requisition = require("lib.widget.requisition")
 local Widget = require("lib.widget")
-local Utils = require("lib.utils")
+local String = require("lib.string")
 
 local Label = Class("Label", Widget)
 
@@ -81,7 +81,7 @@ end
 function Label:render(context)
   context:clear(self.bgColor)
 
-  local visible = Utils.ellipsize(self.text, context:getWidth())
+  local visible = String.ellipsize(self.text, context:getWidth())
   context:renderString(Coord:new(0, 0), visible, self.fgColor, self.bgColor)
 end
 

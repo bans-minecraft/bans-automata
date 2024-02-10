@@ -29,7 +29,7 @@
 -- }
 
 package.path = "/?.lua;" .. package.path
-local Log = require("lib/log")
+local Table = require("lib/table")
 local Utils = require("lib/utils")
 
 local DEFAULT_CONFIG = {
@@ -47,7 +47,7 @@ local DEFAULT_CONFIG = {
   }
 }
 
-local CONFIG = Utils.cloneTable(DEFAULT_CONFIG)
+local CONFIG = Table.clone(DEFAULT_CONFIG)
 local function loadConfig(args)
   local config_path = args[1] or (shell.dir() .. "/dropper-move.cfg")
   CONFIG = Utils.loadConfig(config_path)
@@ -58,7 +58,7 @@ local function shouldMove(name)
     return true
   end
 
-  if Utils.contains(CONFIG.inventory.only, name) then
+  if Table.contains(CONFIG.inventory.only, name) then
     return true
   end
 

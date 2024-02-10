@@ -50,7 +50,7 @@ local Bot = require("lib.bot")
 local Direction = require("lib.direction")
 local Log = require("lib.log")
 local Ores = require("lib.bot.ores")
-local Utils = require("lib.utils")
+local Table = require("lib.table")
 local Vector = require("lib.vector")
 
 Log.setLogFile("bot-log.txt")
@@ -369,7 +369,7 @@ function Miner:excavate()
   local total = 0
 
   -- Push the first excavation scan onto the stack
-  Utils.concat(stack, self:excavationScan())
+  Table.concat(stack, self:excavationScan())
 
   while #stack > 0 do
     -- Get the position and direction of the ore that we found from the top of the stack.
@@ -448,7 +448,7 @@ function Miner:excavate()
       end
 
       -- Perform an excavation scan and place the results onto the excavation stack.
-      Utils.concat(stack, self:excavationScan())
+      Table.concat(stack, self:excavationScan())
     end
   end
 

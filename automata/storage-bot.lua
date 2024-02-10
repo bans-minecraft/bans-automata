@@ -64,7 +64,8 @@ local AAUtils = require("lib.bot.aa.utils")
 local Bot = require("lib.bot")
 local Log = require("lib.log")
 local Direction = require("lib.direction")
-local Utils = require("lib.utils")
+local String = require("lib.string")
+local Table = require("lib.table")
 local Vector = require("lib.vector")
 local class = require("lib.class")
 
@@ -283,7 +284,7 @@ function StoreBot:receiveFuel()
   end
 
   -- Make sure that what is in front of us is something that has an inventory
-  if not Utils.stringStartsWith(infront.info.name, "storagedrawers:") then
+  if not String.startsWith(infront.info.name, "storagedrawers:") then
     Log.error("Unknown field inventory infront of block:", infront.info.name)
     return false, "Unknown fuel inventory"
   end
@@ -425,7 +426,7 @@ function StoreBot:scanSurrounding()
 end
 
 local function isStorageDrawer(item)
-  return Utils.stringStartsWith(item.name, "storagedrawers:")
+  return String.startsWith(item.name, "storagedrawers:")
 end
 
 function StoreBot:scan()
@@ -451,7 +452,7 @@ function StoreBot:scan()
   local found = {}
 
   -- Push the initial scan onto the stack
-  Utils.concat(stack, self:scanSurrounding())
+  Table.concat(stack, self:scanSurrounding())
 
   while #stack > 0 do
     -- Get the target block from the top of the stack.
@@ -669,7 +670,7 @@ function StoreBot:run()
       end
 
       -- If we have any remaining UUIDs, put them back into the bot
-      Utils.concat(self.digitized, digitized)
+      Table.concat(self.digitized, digitized)
     end
 
     -- See if we have anything to handle in our input
