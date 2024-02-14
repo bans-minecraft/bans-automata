@@ -10,16 +10,16 @@ function ReactorApp:init()
   local term = self:bindTerm(self.controlWindow)
   term.context.debug = true
 
-  local monitor = peripheral.find("monitor")
-  if monitor ~= nil then
-    self.statusWindow = require("automata.reactor.windows.status"):new()
-    self:bindMonitor(monitor, self.statusWindow)
-  end
+  -- local monitor = peripheral.find("monitor")
+  -- if monitor ~= nil then
+  --   self.statusWindow = require("automata.reactor.windows.status"):new()
+  --   self:bindMonitor(monitor, self.statusWindow)
+  -- end
 
   self:addTask(function()
     while true do
       self.controlWindow:update()
-      self.statusWindow:update()
+      -- self.statusWindow:update()
       sleep(0.5)
     end
   end)

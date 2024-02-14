@@ -20,9 +20,14 @@ M.level = {
 
 M.logfile = nil
 M.echo = true
+M.indent = 0
 
 M.setEcho = function(echo)
   M.echo = echo
+end
+
+M.setIndent = function(indent)
+  M.indent = indent
 end
 
 M.setLogFile = function(name, fresh)
@@ -32,15 +37,19 @@ M.setLogFile = function(name, fresh)
   end
 end
 
+local INDENT_STRING = "                                                                                "
+
 M.write = function(level, message)
   if M.echo and term and level then
     term.setTextColor(level[2])
   end
 
+  local indent = string.sub(INDENT_STRING, 1, M.indent * 4)
+
   if level then
-    message = ("[%s] %s"):format(level[1], message)
+    message = ("[%s] %s%s"):format(level[1], indent, message)
   else
-    message = ("        %s"):format(message)
+    message = ("        %s%s"):format(indent, message)
   end
 
   if M.echo then
@@ -70,7 +79,7 @@ M.log = function(level, ...)
     elseif v == nil then
       table.insert(args, "nil")
     else
-      table.insert(args, prettyPrint(v, 30))
+      table.insert(args, prettyPrint(v))
     end
   end
 

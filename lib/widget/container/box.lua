@@ -1,10 +1,11 @@
 local Assert = require("lib.assert")
-local Class = require("lib.class")
-local Widget = require("lib.widget")
 local Child = require("lib.widget.container.child")
-local Size = require("lib.size")
+local Class = require("lib.class")
 local Rect = require("lib.rect")
 local Requisition = require("lib.widget.requisition")
+local Size = require("lib.size")
+local Table = require("lib.table")
+local Widget = require("lib.widget")
 
 local Box = Class("Box", Widget)
 
@@ -16,6 +17,12 @@ function Box:init(orientation)
   self.spacing = 0
   self.homogeneous = false
   self.orientation = orientation
+end
+
+function Box:getChildren()
+  return Table.map(self.children, function(child)
+    return child.widget
+  end)
 end
 
 function Box:getChildIndex(widget)
@@ -54,7 +61,7 @@ function Box:addChild(widget, packing, expand, fill, padding)
     child.padding = padding
   end
 
-  widget.parent = self
+  widget:setParent(self)
   self:queueRedraw()
 end
 
@@ -64,7 +71,7 @@ function Box:removeChild(widget)
   local index = self:getChildIndex(widget)
   Assert.assertNeq(index, nil)
   table.remove(self.children, index)
-  widget.parent = nil
+  widget:clearParent()
   self:queueRedraw()
 end
 
@@ -72,7 +79,7 @@ function Box:insertChild(index, widget)
   Assert.assertInstance(widget, Widget)
   Assert.assertEq(widget.parent, nil)
   table.insert(self.children, index, Child:new(widget))
-  widget.parent = self
+  widget:setParent(self)
   self:queueRedraw()
 end
 
@@ -181,6 +188,10 @@ function Box:countExpandedChildren()
 end
 
 function Box:render(context)
+  if self.style and self.style.fill and self.style.bg then
+    context:clear(self.style.bg)
+  end
+
   for _, child in ipairs(self.children) do
     if child.widget.visible then
       context:enterRegion(child.allocation)

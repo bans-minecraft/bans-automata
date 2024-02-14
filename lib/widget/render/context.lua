@@ -1,9 +1,10 @@
 local Assert = require("lib.assert")
 local Class = require("lib.class")
+local Coord = require("lib.coord")
 local Log = require("lib.log")
 local Rect = require("lib.rect")
 local Size = require("lib.size")
-local Coord = require("lib.coord")
+local Theme = require("lib.widget.theme")
 
 local function checkColor(colorOpt, defaultColor)
   if colorOpt ~= nil then
@@ -16,12 +17,18 @@ end
 
 local RenderContext = Class("RenderContext")
 
-function RenderContext:init(target)
+function RenderContext:init(target, themeOpt)
   local width, height = target.getSize()
   self.target = target
   self.region = Rect.make(0, 0, width, height)
   self.stack = {}
   self.debug = false
+
+  if themeOpt ~= nil then
+    self.theme = themeOpt
+  else
+    self.theme = Theme:new()
+  end
 end
 
 function RenderContext:updateSize()
@@ -159,6 +166,7 @@ function RenderContext:renderRect(rect, colorOpt)
 end
 
 function RenderContext:clear(colorOpt)
+  Log.info(("RenderContext:clear(%s): region = %s"):format(colorOpt, self.region))
   self:renderRect(Rect:new(Coord:new(0, 0), self.region.size), checkColor(colorOpt, colors.black))
 end
 

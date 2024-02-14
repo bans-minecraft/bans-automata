@@ -1,20 +1,28 @@
 local Assert = require("lib.assert")
 local Class = require("lib.class")
+local Css = require("lib.widget.theme.css")
 local Log = require("lib.log")
 local RenderContext = require("lib.widget.render.context")
+local Theme = require("lib.widget.theme")
+local Window = require("lib.widget.display.window")
 
 local App = Class("App")
 
-function App:init()
+function App:init(themeOpt)
   self.monitors = {}
   self.running = false
   self.tasks = {}
+  self.theme = Theme:new()
+  if themeOpt ~= nil then
+    self.theme:merge(themeOpt)
+  end
 end
 
 function App:bindTerm(window)
+  Assert.assertInstance(window, Window)
   Assert.assert(self.monitors["__term"] == nil, "Terminal monitor already bound to window")
   local monitor = {
-    context = RenderContext:new(term),
+    context = RenderContext:new(term, self.theme),
     window = window,
   }
 
@@ -23,6 +31,8 @@ function App:bindTerm(window)
 end
 
 function App:bindMonitor(nameOrPeripheral, window)
+  Assert.assertInstance(window, Window)
+
   local name, monitor
   if type(nameOrPeripheral) == "table" then
     monitor = nameOrPeripheral
@@ -37,7 +47,7 @@ function App:bindMonitor(nameOrPeripheral, window)
 
   Assert.assert(self.monitors[name] == nil, ("Monitor '%s' already bound to window"):format(name))
   local monitor = {
-    context = RenderContext:new(monitor),
+    context = RenderContext:new(monitor, self.theme),
     window = window,
   }
 
@@ -52,12 +62,16 @@ function App:render()
       monitor.context:updateSize()
 
       -- Clear the entire target
-      monitor.context.target.clear()
+      -- monitor.context.target.clear()
 
       -- Perform the size calculations
       monitor.window:getSizeRequest()
       local allocation = monitor.context.region:clone()
       monitor.window:setAllocation(allocation)
+
+      -- Apply styles to widget tree
+      local iterator = Css.Iterator:new(monitor.context.theme.css)
+      monitor.window:applyStyle(iterator)
 
       -- Render the window to the render context
       monitor.window:render(monitor.context)

@@ -49,7 +49,7 @@ M.assertIsString = function(value, messageOpt) M.assertIs(value, "string", messa
 M.assertIsTable = function(value, messageOpt) M.assertIs(value, "table", messageOpt) end
 
 M.assertIsCallable = function(value, messageOpt)
-  if Types.isCallable(value) then
+  if not Types.isCallable(value) then
     if messageOpt ~= nil then
       error(("Assertion failed: %s"):format(messageOpt))
     else
@@ -59,7 +59,7 @@ M.assertIsCallable = function(value, messageOpt)
 end
 
 M.assertIsIndexable = function(value, messageOpt)
-  if Types.isIndexable(value) then
+  if not Types.isIndexable(value) then
     if messageOpt ~= nil then
       error(("Assertion failed: %s"):format(messageOpt))
     else
@@ -69,7 +69,7 @@ M.assertIsIndexable = function(value, messageOpt)
 end
 
 M.assertIsIterable = function(value, messageOpt)
-  if Types.isIterable(value) then
+  if not Types.isIterable(value) then
     if messageOpt ~= nil then
       error(("Assertion failed: %s"):format(messageOpt))
     else
@@ -79,7 +79,7 @@ M.assertIsIterable = function(value, messageOpt)
 end
 
 M.assertIsWritable = function(value, messageOpt)
-  if Types.isWritable(value) then
+  if not Types.isWritable(value) then
     if messageOpt ~= nil then
       error(("Assertion failed: %s"):format(messageOpt))
     else

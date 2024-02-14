@@ -9,15 +9,19 @@ function Bin:init()
   self.child = nil
 end
 
+function Bin:getChildren()
+  return { self.child }
+end
+
 function Bin:setChild(child)
   Assert.assertInstance(child, Widget)
   Assert.assertEq(child.parent, nil)
 
   if self.child then
-    self.child.parent = nil
+    self.child:clearParent()
   end
 
-  child.parent = self
+  child:setParent(self)
   self.child = child
 end
 
@@ -25,8 +29,8 @@ function Bin:removeChild(child)
   Assert.assertInstance(child, Widget)
   Assert.assertEq(child.parent, self)
 
+  self.child:clearParent()
   self.child = nil
-  self.child.parent = nil
 end
 
 function Bin:getSizeRequest()
@@ -45,6 +49,10 @@ function Bin:setAllocation(allocation)
 end
 
 function Bin:render(context)
+  if self.style and self.style.fill and self.style.bg then
+    context:clear(self.style.bg)
+  end
+
   if self.child then
     self.child:render(context)
   end

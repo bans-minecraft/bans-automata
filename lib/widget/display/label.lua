@@ -17,8 +17,8 @@ function Label:init(textOpt, fgColorOpt, bgColorOpt, alignOpt)
   Widget.init(self)
 
   self.text = ""
-  self.fgColor = colors.white
-  self.bgColor = colors.black
+  self.fgColor = nil
+  self.bgColor = nil
   self.align = "left"
 
   if textOpt ~= nil then
@@ -79,10 +79,14 @@ function Label:setAllocation(allocation)
 end
 
 function Label:render(context)
-  context:clear(self.bgColor)
+  if self.style and self.style.fill and self.style.bg then
+    context:clear(self.style.bg)
+  end
+
+  require("lib.log").info(("Label:render(%s) style ="):format(self.text), self.style)
 
   local visible = String.ellipsize(self.text, context:getWidth())
-  context:renderString(Coord:new(0, 0), visible, self.fgColor, self.bgColor)
+  context:renderString(Coord:new(0, 0), visible, self.fgColor or self.style.fg, self.bgColor or self.style.bg)
 end
 
 return Label
