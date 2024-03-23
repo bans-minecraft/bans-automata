@@ -37,7 +37,7 @@ M.assertIs = function(value, type_name, messageOpt)
     if messageOpt ~= nil then
       error(("Assertion failed: %s"):format(messageOpt))
     else
-      error(("Assertion failed: expected '%s'; found '%s'"):format(type_name), type(value))
+      error(("Assertion failed: expected '%s'; found '%s'"):format(type_name, type(value)))
     end
   end
 end

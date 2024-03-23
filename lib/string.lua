@@ -89,6 +89,22 @@ M.ellipsize = function(str, width)
   return str
 end
 
+M.leftAlign = function(str, width, char)
+  return str .. string.rep(char or ' ', width - #str)
+end
+
+M.rightAlign = function(str, width, char)
+  return string.rep(char or ' ', width - #str) .. str
+end
+
+M.centerAlign = function(str, width, char)
+  char = char or ' '
+  local pad = width - #str
+  local left = math.floor(pad / 2)
+  local right = math.ceil(pad / 2)
+  return string.rep(char, left) .. str .. string.rep(char, right)
+end
+
 local TRUTHY_STRINGS = {
   yes = true,
   y = true,

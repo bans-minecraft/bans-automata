@@ -7,13 +7,11 @@ local StatusBar = require("lib.widget.display.statusbar")
 local ControlWindow = Class("ControlWindow", Window)
 
 function ControlWindow:init()
-  Window.init(self)
+  Window.init(self, colors.black)
 
   local status = StatusBar:new()
-  self.statusLeft = Label:new("Reactor Control")
-  self.statusRight = Label:new("")
-  status:addChild(self.statusLeft, "start")
-  status:addChild(self.statusRight, "end")
+  self.statusLeft = status:addLabelStart("Reactor Control")
+  self.statusRight = status:addLabelEnd()
 
   local box = Box:new("vertical")
   box:addChild(Label:new("Control Window"), "start", true, true)

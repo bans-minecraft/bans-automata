@@ -3,8 +3,8 @@ local Bin = require("lib.widget.container.bin")
 
 local Window = Class("Window", Bin)
 
-function Window:init()
-  Bin.init(self)
+function Window:init(bgColorOpt)
+  Bin.init(self, bgColorOpt)
   self.redrawQueued = true
 end
 

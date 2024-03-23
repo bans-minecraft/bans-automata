@@ -9,7 +9,7 @@ local Widget = require("lib.widget")
 
 local Box = Class("Box", Widget)
 
-function Box:init(orientation)
+function Box:init(orientation, bgColorOpt)
   Assert.assertIs(orientation, "string")
   Widget.init(self)
   self.border = 0
@@ -17,6 +17,13 @@ function Box:init(orientation)
   self.spacing = 0
   self.homogeneous = false
   self.orientation = orientation
+  self.fill = true
+  self.bgColor = nil
+
+  if bgColorOpt ~= nil then
+    Assert.assertIsNumber(bgColorOpt)
+    self.bgColor = bgColorOpt
+  end
 end
 
 function Box:getChildren()
@@ -95,6 +102,18 @@ function Box:setHomogeneous(active)
   self:queueRedraw()
 end
 
+function Box:setBackground(color)
+  Assert.assertIsNumber(color)
+  self.bgColor = color
+  self:queueRedraw()
+end
+
+function Box:setFilled(filled)
+  Assert.assertIsBoolean(filled)
+  self.fill = filled
+  self:queueRedraw()
+end
+
 function Box:getChildForWidget(widget)
   Assert.assertInstance(widget, Widget)
   local index = self:getChildIndex(widget)
@@ -119,7 +138,7 @@ end
 function Box:setChildPadding(widgetOrIndex, padding)
   Assert.assertIs(padding, "number")
   local child = self:_getChildForWidgetOrIndex(widgetOrIndex)
-  Assert.assertInstance(child, Widget)
+  Assert.assertInstance(child, Child)
   child.padding = padding
   self:queueRedraw()
 end
@@ -127,7 +146,7 @@ end
 function Box:setChildExpand(widgetOrIndex, expand)
   Assert.assertIs(expand, "boolean")
   local child = self:_getChildForWidgetOrIndex(widgetOrIndex)
-  Assert.assertInstance(child, Widget)
+  Assert.assertInstance(child, Child)
   child.expand = expand
   self:queueRedraw()
 end
@@ -135,7 +154,7 @@ end
 function Box:setChildFill(widgetOrIndex, fill)
   Assert.assertIs(fill, "boolean")
   local child = self:_getChildForWidgetOrIndex(widgetOrIndex)
-  Assert.assertInstance(child, Widget)
+  Assert.assertInstance(child, Child)
   child.fill = fill
   self:queueRedraw()
 end
@@ -188,8 +207,8 @@ function Box:countExpandedChildren()
 end
 
 function Box:render(context)
-  if self.style and self.style.fill and self.style.bg then
-    context:clear(self.style.bg)
+  if self.fill then
+    context:clear(self.bgColor)
   end
 
   for _, child in ipairs(self.children) do

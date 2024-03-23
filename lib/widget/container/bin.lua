@@ -4,9 +4,16 @@ local Widget = require("lib.widget")
 
 local Bin = Class("Bin", Widget)
 
-function Bin:init()
+function Bin:init(bgColorOpt)
   Widget.init(self)
+  self.fill = true
+  self.bgColor = nil
   self.child = nil
+
+  if bgColorOpt ~= nil then
+    Assert.assertIsNumber(bgColorOpt)
+    self.bgColor = bgColorOpt
+  end
 end
 
 function Bin:getChildren()
@@ -33,6 +40,18 @@ function Bin:removeChild(child)
   self.child = nil
 end
 
+function Bin:setBackground(color)
+  Assert.assertIsNumber(color)
+  self.bgColor = color
+  self:queueRedraw()
+end
+
+function Bin:setFilled(filled)
+  Assert.assertIsBoolean(filled)
+  self.fill = filled
+  self:queueRedraw()
+end
+
 function Bin:getSizeRequest()
   if self.child then
     return self.child:getSizeRequest()
@@ -49,8 +68,8 @@ function Bin:setAllocation(allocation)
 end
 
 function Bin:render(context)
-  if self.style and self.style.fill and self.style.bg then
-    context:clear(self.style.bg)
+  if self.fill then
+    context:clear(self.bgColor)
   end
 
   if self.child then

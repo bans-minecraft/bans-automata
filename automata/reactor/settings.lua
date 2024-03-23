@@ -40,6 +40,7 @@ function Settings:load()
   Log.info(("Inc. Burn Rate: %d"):format(self.incBurnRate))
   Log.info(("Min. Water: %d"):format(self.minWater))
   Log.info(("Scram Water: %d"):format(self.scramWater))
+  return true
 end
 
 function Settings:save()

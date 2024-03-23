@@ -13,12 +13,25 @@ local function isKnownAlignment(alignment)
   return alignment == "left" or alignment == "right" or alignment == "center"
 end
 
+local function alignText(alignment, width, text)
+  if alignment == "left" then
+    return String.leftAlign(text, width)
+  elseif alignment == "right" then
+    return String.rightAlign(text, width)
+  elseif alignment == "center" then
+    return String.centerAlign(text, width)
+  else
+    return text
+  end
+end
+
 function Label:init(textOpt, fgColorOpt, bgColorOpt, alignOpt)
   Widget.init(self)
 
   self.text = ""
   self.fgColor = nil
   self.bgColor = nil
+  self.fill = true
   self.align = "left"
 
   if textOpt ~= nil then
@@ -55,6 +68,11 @@ function Label:setBackground(color)
   self:queueRedraw()
 end
 
+function Label:setFilled(filled)
+  self.fill = filled
+  self:queueRedraw()
+end
+
 function Label:setText(text)
   Assert.assertIs(text, "string")
   self.text = text
@@ -79,14 +97,19 @@ function Label:setAllocation(allocation)
 end
 
 function Label:render(context)
-  if self.style and self.style.fill and self.style.bg then
-    context:clear(self.style.bg)
+  if self.fill then
+    context:clear(self.bgColor)
   end
 
-  require("lib.log").info(("Label:render(%s) style ="):format(self.text), self.style)
+  local width = context:getWidth()
+  local visible
+  if #self.text < width then
+    visible = alignText(self.align, width, self.text)
+  else
+    visible = String.ellipsize(self.text, width)
+  end
 
-  local visible = String.ellipsize(self.text, context:getWidth())
-  context:renderString(Coord:new(0, 0), visible, self.fgColor or self.style.fg, self.bgColor or self.style.bg)
+  context:renderString(Coord:new(0, 0), visible, self.fgColor, self.bgColor)
 end
 
 return Label

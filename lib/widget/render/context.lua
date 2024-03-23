@@ -4,9 +4,10 @@ local Coord = require("lib.coord")
 local Log = require("lib.log")
 local Rect = require("lib.rect")
 local Size = require("lib.size")
-local Theme = require("lib.widget.theme")
 
-local function checkColor(colorOpt, defaultColor)
+local RenderContext = Class("RenderContext")
+
+RenderContext.static.checkColor = function(colorOpt, defaultColor)
   if colorOpt ~= nil then
     Assert.assertIs(colorOpt, "number")
     return colorOpt
@@ -15,20 +16,12 @@ local function checkColor(colorOpt, defaultColor)
   return defaultColor
 end
 
-local RenderContext = Class("RenderContext")
-
-function RenderContext:init(target, themeOpt)
+function RenderContext:init(target)
   local width, height = target.getSize()
   self.target = target
   self.region = Rect.make(0, 0, width, height)
   self.stack = {}
   self.debug = false
-
-  if themeOpt ~= nil then
-    self.theme = themeOpt
-  else
-    self.theme = Theme:new()
-  end
 end
 
 function RenderContext:updateSize()
@@ -136,7 +129,7 @@ end
 
 function RenderContext:renderRect(rect, colorOpt)
   Assert.assertInstance(rect, Rect)
-  local color = checkColor(colorOpt, colors.white)
+  local color = RenderContext.checkColor(colorOpt, colors.white)
 
   -- Transform and clip the Rect to the draw region and discard degenerate results.
   local drawRect, clipped = self:transformRectAndClip(rect)
@@ -166,8 +159,7 @@ function RenderContext:renderRect(rect, colorOpt)
 end
 
 function RenderContext:clear(colorOpt)
-  Log.info(("RenderContext:clear(%s): region = %s"):format(colorOpt, self.region))
-  self:renderRect(Rect:new(Coord:new(0, 0), self.region.size), checkColor(colorOpt, colors.black))
+  self:renderRect(Rect:new(Coord:new(0, 0), self.region.size), RenderContext.checkColor(colorOpt, colors.black))
 end
 
 function RenderContext:renderString(position, content, fgColorOpt, bgColorOpt)
@@ -197,8 +189,8 @@ function RenderContext:renderString(position, content, fgColorOpt, bgColorOpt)
     content = content:sub(1, drawRect.size.width)
   end
 
-  local fgColor = checkColor(fgColorOpt, colors.white)
-  local bgColor = checkColor(bgColorOpt, colors.black)
+  local fgColor = RenderContext.checkColor(fgColorOpt, colors.white)
+  local bgColor = RenderContext.checkColor(bgColorOpt, colors.black)
 
   self.target.setCursorPos(drawRect.position.col + 1, drawRect.position.row + 1)
   self.target.setBackgroundColor(bgColor)

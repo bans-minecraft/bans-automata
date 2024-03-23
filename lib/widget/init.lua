@@ -4,7 +4,6 @@ local Rect = require("lib.rect")
 local RenderContext = require("lib.widget.render.context")
 local Requisition = require("lib.widget.requisition")
 local Size = require("lib.size")
-local Css = require("lib.widget.theme.css")
 local Log = require("lib.log")
 
 local Widget = Class("Widget")
@@ -59,26 +58,6 @@ end
 
 function Widget:render(context)
   Assert.assertInstance(context, RenderContext)
-end
-
-function Widget:applyStyle(iterator)
-  Log.info("Widget:applyStyle", self)
-  Log.indent = Log.indent + 1
-  Assert.assertInstance(iterator, Css.Iterator)
-  iterator:enter(self)
-  if iterator.node then
-    Log.info("Applying style to", self, ":", iterator.node.attributes)
-    self.style = iterator.node.attributes
-  end
-
-  local children = self:getChildren()
-  Log.info(self, "has", #children, "children")
-  for _, child in pairs(children) do
-    child:applyStyle(iterator)
-  end
-
-  iterator:leave()
-  Log.indent = Log.indent - 1
 end
 
 return Widget
